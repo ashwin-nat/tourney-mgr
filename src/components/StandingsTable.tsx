@@ -3,21 +3,23 @@ import type { Participant, Standing } from "../types";
 type Props = {
   participants: Participant[];
   standings: Record<string, Standing> | undefined;
+  title?: string;
 };
 
-export function StandingsTable({ participants, standings }: Props) {
+export function StandingsTable({ participants, standings, title = "Standings" }: Props) {
   if (!standings) return null;
   const rows = [...participants].sort((a, b) => {
     const sa = standings[a.id];
     const sb = standings[b.id];
     if (!sa || !sb) return 0;
     if (sa.points !== sb.points) return sb.points - sa.points;
-    return (sb.buchholz ?? 0) - (sa.buchholz ?? 0);
+    if (sa.wins !== sb.wins) return sb.wins - sa.wins;
+    return b.rating - a.rating;
   });
 
   return (
     <section className="panel">
-      <h3>Standings</h3>
+      <h3>{title}</h3>
       <table>
         <thead>
           <tr>
@@ -27,7 +29,6 @@ export function StandingsTable({ participants, standings }: Props) {
             <th>D</th>
             <th>L</th>
             <th>Pts</th>
-            <th>Buchholz</th>
           </tr>
         </thead>
         <tbody>
@@ -41,7 +42,6 @@ export function StandingsTable({ participants, standings }: Props) {
                 <td>{s.draws}</td>
                 <td>{s.losses}</td>
                 <td>{s.points}</td>
-                <td>{s.buchholz ?? 0}</td>
               </tr>
             );
           })}

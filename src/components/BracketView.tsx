@@ -32,29 +32,31 @@ export function BracketView({
   const { format, matches } = tournament;
   if (!matches.length) return null;
   const championName = getTournamentChampionName(tournament);
-  const stages: Match["stage"][] = ["GROUP", "SWISS", "KNOCKOUT"];
-  const stageGroups = stages
-    .map((stage) => ({
-      stage,
-      rounds: [...new Set(matches.filter((m) => m.stage === stage).map((m) => m.round))].sort(
-        (a, b) => a - b,
-      ),
-    }))
-    .filter((group) => group.rounds.length > 0);
+  const latestRound = Math.max(...matches.map((match) => match.round), 0);
+  const roundsForStage = (stage: Match["stage"]) =>
+    [...new Set(matches.filter((match) => match.stage === stage).map((match) => match.round))].sort(
+      (a, b) => a - b,
+    );
 
-  return (
-    <section className="panel">
-      <h3>{format === "KNOCKOUT" ? "Bracket" : "Rounds"}</h3>
+  function renderRoundsForStage(stage: Match["stage"]) {
+    const rounds = roundsForStage(stage);
+    if (!rounds.length) return null;
+    return (
       <div className="bracket">
-        {stageGroups.map((group) =>
-          group.rounds.map((round) => (
-            <div key={`${group.stage}-${round}`} className="roundCol">
-              <h4>
-                {stageLabel(group.stage)} R{round}
-              </h4>
-              {matches
-                .filter((m) => m.stage === group.stage && m.round === round)
-                .map((m) => (
+        {rounds.map((round) => (
+          <div key={`${stage}-${round}`} className="roundCol">
+            <h4>
+              {stageLabel(stage)} R{round}
+            </h4>
+            {matches
+              .filter((m) => m.stage === stage && m.round === round)
+              .map((m) => {
+                const manualResultDisabled = m.round !== latestRound;
+                const manualResultReason = manualResultDisabled
+                  ? "Manual recording is only allowed for matches in the latest round."
+                  : undefined;
+
+                return (
                   <div key={m.id} className="miniCard">
                     <div className="nameRow">
                       <span>{participantName(tournament, m.playerA)}</span>
@@ -82,20 +84,48 @@ export function BracketView({
                     )}
                     {m.playerA !== BYE_ID && m.playerB !== BYE_ID && (
                       <div className="row">
-                        <button onClick={() => onSetMatchResult(m.id, m.playerA)}>
+                        <button
+                          disabled={manualResultDisabled}
+                          title={manualResultReason}
+                          onClick={() => onSetMatchResult(m.id, m.playerA)}
+                        >
                           {m.played ? "Set Winner" : "Record"} {participantName(tournament, m.playerA)}
                         </button>
-                        <button onClick={() => onSetMatchResult(m.id, m.playerB)}>
+                        <button
+                          disabled={manualResultDisabled}
+                          title={manualResultReason}
+                          onClick={() => onSetMatchResult(m.id, m.playerB)}
+                        >
                           {m.played ? "Set Winner" : "Record"} {participantName(tournament, m.playerB)}
                         </button>
                       </div>
                     )}
                   </div>
-                ))}
-            </div>
-          )),
-        )}
+                );
+              })}
+          </div>
+        ))}
       </div>
+    );
+  }
+
+  return (
+    <section className="panel">
+      <h3>{format === "KNOCKOUT" ? "Bracket" : "Rounds"}</h3>
+      {format === "GROUP_KO" ? (
+        <div className="stack">
+          <section>
+            <h4>Group Stage</h4>
+            {renderRoundsForStage("GROUP")}
+          </section>
+          <section>
+            <h4>Knockout Stage</h4>
+            {renderRoundsForStage("KNOCKOUT") ?? <p>Not started yet.</p>}
+          </section>
+        </div>
+      ) : (
+        renderRoundsForStage(format === "SWISS" ? "SWISS" : "KNOCKOUT")
+      )}
       {tournament.status === "COMPLETED" && (
         <div className="championBlock">
           <h4>Champion</h4>

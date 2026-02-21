@@ -1,3 +1,4 @@
+import { buildStandings } from "../engine/standings";
 import type { ParticipantHistory, Tournament } from "../types";
 import { BracketView } from "./BracketView";
 import { StandingsTable } from "./StandingsTable";
@@ -26,6 +27,7 @@ export function TournamentDetail({
   onRatingChange,
 }: Props) {
   const nextRound = tournament.matches.find((m) => !m.played)?.round;
+  const groupStageMatches = tournament.matches.filter((m) => m.stage === "GROUP");
 
   return (
     <section className="panel">
@@ -72,12 +74,30 @@ export function TournamentDetail({
         ))}
       </div>
 
-      {tournament.format !== "KNOCKOUT" && (
+      {tournament.format === "SWISS" && (
         <StandingsTable
           participants={tournament.participants}
           standings={tournament.standings}
         />
       )}
+      {tournament.format === "GROUP_KO" &&
+        (tournament.groups ?? []).map((group) => {
+          const groupParticipants = tournament.participants.filter((participant) =>
+            group.participantIds.includes(participant.id),
+          );
+          const standings = buildStandings(
+            groupParticipants,
+            groupStageMatches.filter((match) => match.groupId === group.id),
+          );
+          return (
+            <StandingsTable
+              key={group.id}
+              participants={groupParticipants}
+              standings={standings}
+              title={`Group ${group.id} Standings`}
+            />
+          );
+        })}
       <BracketView
         tournament={tournament}
         onSimulateMatch={onSimulateMatch}

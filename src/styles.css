@@ -228,6 +228,46 @@ td {
   background: #f5f9ff;
 }
 
+.selectedRow {
+  background: #eaf3ff;
+}
+
+.linkButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: #0f5ec7;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: #0b1a2b80;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.modalCard {
+  width: min(900px, 100%);
+  max-height: min(80vh, 760px);
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid #d7e4f8;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 12px 40px #12284a33;
+}
+
+.modalHeader {
+  justify-content: space-between;
+  align-items: center;
+}
+
 details {
   border: 1px dashed #c4d5ed;
   border-radius: 10px;

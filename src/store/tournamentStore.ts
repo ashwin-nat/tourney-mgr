@@ -205,6 +205,11 @@ function applyManualMatchResult(
   matchId: string,
   winnerId: string,
 ): Tournament {
+  const targetMatch = tournament.matches.find((match) => match.id === matchId);
+  if (!targetMatch) return tournament;
+  const latestRound = Math.max(...tournament.matches.map((match) => match.round), 0);
+  if (targetMatch.round !== latestRound) return tournament;
+
   const matches = tournament.matches.map((match) => {
     if (match.id !== matchId) return match;
     const winner =
