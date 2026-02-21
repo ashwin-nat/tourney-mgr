@@ -1,10 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { CreateTournamentForm } from "./components/CreateTournamentForm";
+import { HistoryPage } from "./components/HistoryPage";
 import { TournamentDetail } from "./components/TournamentDetail";
 import { TournamentList } from "./components/TournamentList";
 import { useTournamentStore } from "./store/tournamentStore";
 
 export default function App() {
+  const [page, setPage] = useState<"TOURNAMENTS" | "HISTORY">("TOURNAMENTS");
   const {
     tournaments,
     participantHistory,
@@ -30,37 +32,64 @@ export default function App() {
   );
 
   return (
-    <main className="layout">
-      <aside>
-        <CreateTournamentForm onCreate={createTournament} historyNames={historyNames} />
-        <TournamentList
-          tournaments={tournaments}
-          currentId={currentTournamentId}
-          onSelect={selectTournament}
-          onDelete={deleteTournament}
-        />
-      </aside>
-      <section>
-        {current ? (
-          <TournamentDetail
-            tournament={current}
-            participantHistory={participantHistory}
-            onGenerateFixtures={() => generateFixtures(current.id)}
-            onSimulateMatch={(matchId) => simulateMatch(current.id, matchId)}
-            onSimulateRound={(round) => simulateRound(current.id, round)}
-            onSimulateAll={() => simulateAll(current.id)}
-            onReset={() => resetTournament(current.id)}
-            onRatingChange={(participantId, rating) =>
-              updateParticipantRating(current.id, participantId, rating)
-            }
-          />
-        ) : (
-          <section className="panel">
-            <h2>No Tournament Selected</h2>
-            <p>Create and select a tournament to begin.</p>
-          </section>
-        )}
+    <main className="pageRoot">
+      <section className="panel pageNav">
+        <button
+          className={page === "TOURNAMENTS" ? "tabButton active" : "tabButton"}
+          onClick={() => setPage("TOURNAMENTS")}
+        >
+          Tournaments
+        </button>
+        <button
+          className={page === "HISTORY" ? "tabButton active" : "tabButton"}
+          onClick={() => setPage("HISTORY")}
+        >
+          History
+        </button>
       </section>
+      {page === "TOURNAMENTS" ? (
+        <section className="layout">
+          <aside>
+            <CreateTournamentForm onCreate={createTournament} historyNames={historyNames} />
+            <TournamentList
+              tournaments={tournaments}
+              currentId={currentTournamentId}
+              onSelect={selectTournament}
+              onDelete={deleteTournament}
+            />
+          </aside>
+          <section>
+            {current ? (
+              <TournamentDetail
+                tournament={current}
+                participantHistory={participantHistory}
+                onGenerateFixtures={() => generateFixtures(current.id)}
+                onSimulateMatch={(matchId) => simulateMatch(current.id, matchId)}
+                onSimulateRound={(round) => simulateRound(current.id, round)}
+                onSimulateAll={() => simulateAll(current.id)}
+                onReset={() => resetTournament(current.id)}
+                onRatingChange={(participantId, rating) =>
+                  updateParticipantRating(current.id, participantId, rating)
+                }
+              />
+            ) : (
+              <section className="panel">
+                <h2>No Tournament Selected</h2>
+                <p>Create and select a tournament to begin.</p>
+              </section>
+            )}
+          </section>
+        </section>
+      ) : (
+        <HistoryPage
+          tournaments={tournaments}
+          participantHistory={participantHistory}
+          onOpenTournament={(id) => {
+            selectTournament(id);
+            setPage("TOURNAMENTS");
+          }}
+        />
+      )}
     </main>
   );
 }

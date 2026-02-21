@@ -29,9 +29,29 @@ function createDraftParticipant(): DraftParticipant {
   return { id: makeId("pd"), name: "", rating: 50 };
 }
 
+function formatLabel(format: TournamentFormat): string {
+  if (format === "GROUP_KO") return "Group + Knockout";
+  if (format === "SWISS") return "Swiss";
+  return "Knockout";
+}
+
+function timestampLabel(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hour = String(date.getHours()).padStart(2, "0");
+  const minute = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hour}:${minute}`;
+}
+
+function makeDefaultName(format: TournamentFormat): string {
+  return `${formatLabel(format)} ${timestampLabel(new Date())}`;
+}
+
 export function CreateTournamentForm({ onCreate, historyNames }: Props) {
-  const [name, setName] = useState("");
   const [format, setFormat] = useState<TournamentFormat>("KNOCKOUT");
+  const [lastAutoName, setLastAutoName] = useState(() => makeDefaultName("KNOCKOUT"));
+  const [name, setName] = useState(() => lastAutoName);
   const [draftParticipants, setDraftParticipants] = useState<DraftParticipant[]>([
     createDraftParticipant(),
     createDraftParticipant(),
@@ -64,13 +84,25 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
       <div className="stack">
         <label>
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={lastAutoName}
+          />
         </label>
         <label>
           Format
           <select
             value={format}
-            onChange={(e) => setFormat(e.target.value as TournamentFormat)}
+            onChange={(e) => {
+              const nextFormat = e.target.value as TournamentFormat;
+              setFormat(nextFormat);
+              if (name === lastAutoName) {
+                const auto = makeDefaultName(nextFormat);
+                setName(auto);
+                setLastAutoName(auto);
+              }
+            }}
           >
             <option value="KNOCKOUT">Pure Knockout</option>
             <option value="GROUP_KO">Group + Knockout</option>
@@ -209,8 +241,9 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
         </details>
         <button
           onClick={() => {
+            const resolvedName = name.trim() || makeDefaultName(format);
             onCreate({
-              name,
+              name: resolvedName,
               format,
               participants,
               settings: {
@@ -220,7 +253,9 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
                 randomSeed: seed === "" ? undefined : Number(seed),
               },
             });
-            setName("");
+            const nextAutoName = makeDefaultName(format);
+            setName(nextAutoName);
+            setLastAutoName(nextAutoName);
             setDraftParticipants([createDraftParticipant(), createDraftParticipant()]);
             setParticipantsRaw("");
           }}

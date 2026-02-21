@@ -12,11 +12,21 @@ body {
   margin: 0;
 }
 
+.pageRoot {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.pageNav {
+  display: flex;
+  gap: 8px;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
   gap: 16px;
-  padding: 16px;
   align-items: start;
 }
 
@@ -77,6 +87,16 @@ button {
   color: white;
   border: none;
   cursor: pointer;
+}
+
+.tabButton {
+  background: #dde9f9;
+  color: #153055;
+}
+
+.tabButton.active {
+  background: #0f5ec7;
+  color: #ffffff;
 }
 
 button:disabled {
@@ -173,6 +193,39 @@ td {
   min-width: 170px;
   display: grid;
   gap: 8px;
+}
+
+.championBlock {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 2px solid #f3c12f;
+  background: linear-gradient(135deg, #fff8de, #ffefb8);
+}
+
+.championBlock h4 {
+  margin: 0 0 4px 0;
+}
+
+.championBlock p {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.historySummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.historyTable tbody tr {
+  cursor: pointer;
+}
+
+.historyTable tbody tr:hover {
+  background: #f5f9ff;
 }
 
 details {

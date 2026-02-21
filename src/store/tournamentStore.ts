@@ -36,9 +36,11 @@ type Store = {
   ) => void;
   generateFixtures: (id: string) => void;
   simulateMatch: (id: string, matchId: string) => void;
+  setMatchResult: (id: string, matchId: string, scoreA: number, scoreB: number) => void;
   simulateRound: (id: string, round: number) => void;
   simulateAll: (id: string) => void;
   resetTournament: (id: string) => void;
+  clearAll: () => void;
 };
 
 function clampRating(v: number): number {
@@ -142,6 +144,28 @@ function applyMatchSimulation(tournament: Tournament, matchIds: string[]): Tourn
   const matches = tournament.matches.map((match) => {
     if (!set.has(match.id) || match.played) return match;
     return { ...match, ...simulateMatchResult(tournament, match) };
+  });
+  return runFormatProgression({ ...tournament, matches, status: "IN_PROGRESS" });
+}
+
+function applyManualMatchResult(
+  tournament: Tournament,
+  matchId: string,
+  scoreA: number,
+  scoreB: number,
+): Tournament {
+  const matches = tournament.matches.map((match) => {
+    if (match.id !== matchId) return match;
+    let winner: string | undefined;
+    if (scoreA > scoreB) winner = match.playerA;
+    if (scoreB > scoreA) winner = match.playerB;
+    return {
+      ...match,
+      scoreA,
+      scoreB,
+      winner,
+      played: true,
+    };
   });
   return runFormatProgression({ ...tournament, matches, status: "IN_PROGRESS" });
 }
@@ -301,6 +325,20 @@ export const useTournamentStore = create<Store>((set, get) => {
       persist(next);
       set({ tournaments, participantHistory });
     },
+    setMatchResult(id, matchId, scoreA, scoreB) {
+      const tournaments = get().tournaments.map((t) => {
+        if (t.id !== id) return t;
+        return applyManualMatchResult(t, matchId, scoreA, scoreB);
+      });
+      const participantHistory = deriveHistoryFromTournaments(tournaments);
+      const next = {
+        tournaments,
+        currentTournamentId: get().currentTournamentId,
+        participantHistory,
+      };
+      persist(next);
+      set({ tournaments, participantHistory });
+    },
     simulateRound(id, round) {
       let participantHistory = get().participantHistory;
       const tournaments = get().tournaments.map((t) => {
@@ -384,6 +422,15 @@ export const useTournamentStore = create<Store>((set, get) => {
       };
       persist(next);
       set({ tournaments });
+    },
+    clearAll() {
+      const next = {
+        tournaments: [],
+        currentTournamentId: null,
+        participantHistory: {},
+      };
+      persist(next);
+      set(next);
     },
   };
 });

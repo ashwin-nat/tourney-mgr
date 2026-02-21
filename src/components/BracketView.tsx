@@ -1,15 +1,14 @@
-import type { Match, Participant, TournamentFormat } from "../types";
+import type { Match, Tournament } from "../types";
+import { getTournamentChampionName } from "../utils/champion";
 
 type Props = {
-  format: TournamentFormat;
-  participants: Participant[];
-  matches: Match[];
+  tournament: Tournament;
   onSimulateMatch: (matchId: string) => void;
 };
 
-function participantName(participants: Participant[], id: string): string {
+function participantName(tournament: Tournament, id: string): string {
   if (id === "BYE") return "BYE";
-  return participants.find((p) => p.id === id)?.name ?? "Unknown";
+  return tournament.participants.find((p) => p.id === id)?.name ?? "Unknown";
 }
 
 function stageLabel(stage: Match["stage"]): string {
@@ -24,8 +23,10 @@ function outcomeFor(match: Match, participantId: string): "win" | "loss" | "draw
   return match.winner === participantId ? "win" : "loss";
 }
 
-export function BracketView({ format, participants, matches, onSimulateMatch }: Props) {
+export function BracketView({ tournament, onSimulateMatch }: Props) {
+  const { format, matches } = tournament;
   if (!matches.length) return null;
+  const championName = getTournamentChampionName(tournament);
   const stages: Match["stage"][] = ["GROUP", "SWISS", "KNOCKOUT"];
   const stageGroups = stages
     .map((stage) => ({
@@ -51,21 +52,21 @@ export function BracketView({ format, participants, matches, onSimulateMatch }: 
                 .map((m) => (
                   <div key={m.id} className="miniCard">
                     <div className="nameRow">
-                      <span>{participantName(participants, m.playerA)}</span>
+                      <span>{participantName(tournament, m.playerA)}</span>
                       {outcomeFor(m, m.playerA) === "win" && (
-                        <span className="resultMark win">✔</span>
+                        <span className="resultMark win">[W]</span>
                       )}
                       {outcomeFor(m, m.playerA) === "loss" && (
-                        <span className="resultMark loss">✖</span>
+                        <span className="resultMark loss">[L]</span>
                       )}
                     </div>
                     <div className="nameRow">
-                      <span>{participantName(participants, m.playerB)}</span>
+                      <span>{participantName(tournament, m.playerB)}</span>
                       {outcomeFor(m, m.playerB) === "win" && (
-                        <span className="resultMark win">✔</span>
+                        <span className="resultMark win">[W]</span>
                       )}
                       {outcomeFor(m, m.playerB) === "loss" && (
-                        <span className="resultMark loss">✖</span>
+                        <span className="resultMark loss">[L]</span>
                       )}
                     </div>
                     {m.groupId && <small>Group {m.groupId}</small>}
@@ -80,6 +81,12 @@ export function BracketView({ format, participants, matches, onSimulateMatch }: 
           )),
         )}
       </div>
+      {tournament.status === "COMPLETED" && (
+        <div className="championBlock">
+          <h4>Champion</h4>
+          <p>{championName ?? "No champion determined"}</p>
+        </div>
+      )}
     </section>
   );
 }
