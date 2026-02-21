@@ -57,6 +57,16 @@ function emptyHistory(name: string): ParticipantHistory {
     draws: 0,
     played: 0,
     tournaments: 0,
+    completedTournaments: 0,
+    championships: 0,
+    runnerUps: 0,
+    finals: 0,
+    stageStats: {
+      group: { played: 0, wins: 0, losses: 0, draws: 0 },
+      knockout: { played: 0, wins: 0, losses: 0, draws: 0 },
+      swiss: { played: 0, wins: 0, losses: 0, draws: 0 },
+      league: { played: 0, wins: 0, losses: 0, draws: 0 },
+    },
     opponents: {},
   };
 }
@@ -100,6 +110,49 @@ function normalizeHistory(
       draws: existing.draws + value.draws,
       played: existing.played + value.played,
       tournaments: existing.tournaments + (value.tournaments ?? 0),
+      completedTournaments:
+        existing.completedTournaments + (value.completedTournaments ?? 0),
+      championships: existing.championships + (value.championships ?? 0),
+      runnerUps: existing.runnerUps + (value.runnerUps ?? 0),
+      finals: existing.finals + (value.finals ?? 0),
+      stageStats: {
+        group: {
+          played:
+            existing.stageStats.group.played + (value.stageStats?.group?.played ?? 0),
+          wins: existing.stageStats.group.wins + (value.stageStats?.group?.wins ?? 0),
+          losses:
+            existing.stageStats.group.losses + (value.stageStats?.group?.losses ?? 0),
+          draws: existing.stageStats.group.draws + (value.stageStats?.group?.draws ?? 0),
+        },
+        knockout: {
+          played:
+            existing.stageStats.knockout.played +
+            (value.stageStats?.knockout?.played ?? 0),
+          wins:
+            existing.stageStats.knockout.wins + (value.stageStats?.knockout?.wins ?? 0),
+          losses:
+            existing.stageStats.knockout.losses +
+            (value.stageStats?.knockout?.losses ?? 0),
+          draws:
+            existing.stageStats.knockout.draws + (value.stageStats?.knockout?.draws ?? 0),
+        },
+        swiss: {
+          played:
+            existing.stageStats.swiss.played + (value.stageStats?.swiss?.played ?? 0),
+          wins: existing.stageStats.swiss.wins + (value.stageStats?.swiss?.wins ?? 0),
+          losses:
+            existing.stageStats.swiss.losses + (value.stageStats?.swiss?.losses ?? 0),
+          draws: existing.stageStats.swiss.draws + (value.stageStats?.swiss?.draws ?? 0),
+        },
+        league: {
+          played:
+            existing.stageStats.league.played + (value.stageStats?.league?.played ?? 0),
+          wins: existing.stageStats.league.wins + (value.stageStats?.league?.wins ?? 0),
+          losses:
+            existing.stageStats.league.losses + (value.stageStats?.league?.losses ?? 0),
+          draws: existing.stageStats.league.draws + (value.stageStats?.league?.draws ?? 0),
+        },
+      },
       opponents,
     };
   }

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { ParticipantHistory, Tournament } from "../types";
-import { getTournamentChampionName } from "../utils/champion";
+import type { MatchStage, ParticipantHistory, Tournament, TournamentFormat } from "../types";
+import {
+  getTournamentChampionName,
+  getTournamentChampionId,
+  getTournamentRunnerUpId,
+} from "../utils/champion";
 import { SortableTable } from "./SortableTable";
 
 type Props = {
@@ -13,6 +17,47 @@ type Props = {
 
 function pct(value: number): string {
   return `${value.toFixed(1)}%`;
+}
+
+function winRate(wins: number, played: number): number {
+  return played ? (wins / played) * 100 : 0;
+}
+
+type StageBucket = {
+  played: number;
+  wins: number;
+  losses: number;
+  draws: number;
+};
+
+type FormatStatsRow = {
+  format: TournamentFormat;
+  tournaments: number;
+  completedTournaments: number;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  championships: number;
+  runnerUps: number;
+  finals: number;
+  winRate: number;
+  finalConversionRate: number;
+  groupWinRate: number;
+  knockoutWinRate: number;
+  swissWinRate: number;
+  leagueWinRate: number;
+};
+
+function emptyStageBucket(): StageBucket {
+  return { played: 0, wins: 0, losses: 0, draws: 0 };
+}
+
+function stageLabel(stage: MatchStage): "group" | "knockout" | "swiss" | "league" {
+  if (stage === "GROUP") return "group";
+  if (stage === "KNOCKOUT") return "knockout";
+  if (stage === "SWISS") return "swiss";
+  return "league";
 }
 
 export function HistoryPage({
@@ -45,6 +90,119 @@ export function HistoryPage({
       }),
     [selectedParticipant],
   );
+  const selectedByFormat = useMemo<FormatStatsRow[]>(() => {
+    if (!selectedParticipant) return [];
+    const participantKey = selectedParticipant.name.trim().toLowerCase();
+    const byFormat = new Map<
+      TournamentFormat,
+      {
+        format: TournamentFormat;
+        tournaments: number;
+        completedTournaments: number;
+        played: number;
+        wins: number;
+        draws: number;
+        losses: number;
+        championships: number;
+        runnerUps: number;
+        finals: number;
+        stageStats: Record<"group" | "knockout" | "swiss" | "league", StageBucket>;
+      }
+    >();
+
+    for (const tournament of tournaments) {
+      const selectedParticipantInTournament = tournament.participants.find(
+        (participant) => participant.name.trim().toLowerCase() === participantKey,
+      );
+      if (!selectedParticipantInTournament) continue;
+
+      const stats = byFormat.get(tournament.format) ?? {
+        format: tournament.format,
+        tournaments: 0,
+        completedTournaments: 0,
+        played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        championships: 0,
+        runnerUps: 0,
+        finals: 0,
+        stageStats: {
+          group: emptyStageBucket(),
+          knockout: emptyStageBucket(),
+          swiss: emptyStageBucket(),
+          league: emptyStageBucket(),
+        },
+      };
+
+      stats.tournaments += 1;
+      if (tournament.status === "COMPLETED") stats.completedTournaments += 1;
+
+      for (const match of tournament.matches) {
+        if (!match.played) continue;
+        if (
+          match.playerA !== selectedParticipantInTournament.id &&
+          match.playerB !== selectedParticipantInTournament.id
+        ) {
+          continue;
+        }
+
+        const stage = stageLabel(match.stage);
+        stats.played += 1;
+        stats.stageStats[stage].played += 1;
+
+        if (match.winner === undefined) {
+          stats.draws += 1;
+          stats.stageStats[stage].draws += 1;
+        } else if (match.winner === selectedParticipantInTournament.id) {
+          stats.wins += 1;
+          stats.stageStats[stage].wins += 1;
+        } else {
+          stats.losses += 1;
+          stats.stageStats[stage].losses += 1;
+        }
+      }
+
+      if (tournament.status === "COMPLETED") {
+        const championId = getTournamentChampionId(tournament);
+        const runnerUpId = getTournamentRunnerUpId(tournament);
+        if (championId === selectedParticipantInTournament.id) {
+          stats.championships += 1;
+          stats.finals += 1;
+        }
+        if (runnerUpId === selectedParticipantInTournament.id) {
+          stats.runnerUps += 1;
+          stats.finals += 1;
+        }
+      }
+
+      byFormat.set(tournament.format, stats);
+    }
+
+    return [...byFormat.values()]
+      .map((stats) => ({
+        format: stats.format,
+        tournaments: stats.tournaments,
+        completedTournaments: stats.completedTournaments,
+        played: stats.played,
+        wins: stats.wins,
+        draws: stats.draws,
+        losses: stats.losses,
+        championships: stats.championships,
+        runnerUps: stats.runnerUps,
+        finals: stats.finals,
+        winRate: winRate(stats.wins, stats.played),
+        finalConversionRate: winRate(stats.championships, stats.finals),
+        groupWinRate: winRate(stats.stageStats.group.wins, stats.stageStats.group.played),
+        knockoutWinRate: winRate(
+          stats.stageStats.knockout.wins,
+          stats.stageStats.knockout.played,
+        ),
+        swissWinRate: winRate(stats.stageStats.swiss.wins, stats.stageStats.swiss.played),
+        leagueWinRate: winRate(stats.stageStats.league.wins, stats.stageStats.league.played),
+      }))
+      .sort((a, b) => a.format.localeCompare(b.format));
+  }, [selectedParticipant, tournaments]);
 
   useEffect(() => {
     if (!selectedParticipant) return;
@@ -69,7 +227,6 @@ export function HistoryPage({
   );
   const participantRows = participants.map((entry) => {
     const key = entry.name.trim().toLowerCase();
-    const winRate = entry.played ? (entry.wins / entry.played) * 100 : 0;
     return {
       key,
       player: entry.name,
@@ -78,7 +235,17 @@ export function HistoryPage({
       draws: entry.draws,
       losses: entry.losses,
       tournaments: entry.tournaments,
-      winRate,
+      completedTournaments: entry.completedTournaments,
+      championships: entry.championships,
+      runnerUps: entry.runnerUps,
+      finals: entry.finals,
+      finalConversionRate: winRate(entry.championships, entry.finals),
+      winRate: winRate(entry.wins, entry.played),
+      groupWinRate: winRate(entry.stageStats.group.wins, entry.stageStats.group.played),
+      knockoutWinRate: winRate(
+        entry.stageStats.knockout.wins,
+        entry.stageStats.knockout.played,
+      ),
       opponents: Object.keys(entry.opponents ?? {}).length,
       selected: key === selectedParticipantKey,
     };
@@ -107,7 +274,26 @@ export function HistoryPage({
       { header: "D", accessorKey: "draws" },
       { header: "L", accessorKey: "losses" },
       { header: "T", accessorKey: "tournaments" },
+      { header: "CT", accessorKey: "completedTournaments" },
+      { header: "Titles", accessorKey: "championships" },
+      { header: "RU", accessorKey: "runnerUps" },
+      { header: "Finals", accessorKey: "finals" },
+      {
+        header: "Final Conv%",
+        accessorKey: "finalConversionRate",
+        cell: (ctx) => pct(ctx.getValue<number>()),
+      },
       { header: "Win%", accessorKey: "winRate", cell: (ctx) => pct(ctx.getValue<number>()) },
+      {
+        header: "Group Win%",
+        accessorKey: "groupWinRate",
+        cell: (ctx) => pct(ctx.getValue<number>()),
+      },
+      {
+        header: "KO Win%",
+        accessorKey: "knockoutWinRate",
+        cell: (ctx) => pct(ctx.getValue<number>()),
+      },
       { header: "Opponents", accessorKey: "opponents" },
     ],
     [setSelectedParticipantKey],
@@ -165,6 +351,47 @@ export function HistoryPage({
       { header: "L", accessorKey: "losses" },
       { header: "D", accessorKey: "draws" },
       { header: "Win%", accessorKey: "winRate", cell: (ctx) => pct(ctx.getValue<number>()) },
+    ],
+    [],
+  );
+  const formatColumns = useMemo<ColumnDef<FormatStatsRow>[]>(
+    () => [
+      { header: "Format", accessorKey: "format" },
+      { header: "T", accessorKey: "tournaments" },
+      { header: "CT", accessorKey: "completedTournaments" },
+      { header: "P", accessorKey: "played" },
+      { header: "W", accessorKey: "wins" },
+      { header: "D", accessorKey: "draws" },
+      { header: "L", accessorKey: "losses" },
+      { header: "Titles", accessorKey: "championships" },
+      { header: "RU", accessorKey: "runnerUps" },
+      { header: "Finals", accessorKey: "finals" },
+      {
+        header: "Final Conv%",
+        accessorKey: "finalConversionRate",
+        cell: (ctx) => pct(ctx.getValue<number>()),
+      },
+      { header: "Win%", accessorKey: "winRate", cell: (ctx) => pct(ctx.getValue<number>()) },
+      {
+        header: "Group Win%",
+        accessorKey: "groupWinRate",
+        cell: (ctx) => pct(ctx.getValue<number>()),
+      },
+      {
+        header: "KO Win%",
+        accessorKey: "knockoutWinRate",
+        cell: (ctx) => pct(ctx.getValue<number>()),
+      },
+      {
+        header: "Swiss Win%",
+        accessorKey: "swissWinRate",
+        cell: (ctx) => pct(ctx.getValue<number>()),
+      },
+      {
+        header: "League Win%",
+        accessorKey: "leagueWinRate",
+        cell: (ctx) => pct(ctx.getValue<number>()),
+      },
     ],
     [],
   );
@@ -260,12 +487,82 @@ export function HistoryPage({
                 <strong>{selectedParticipant.draws}</strong>
                 <small>Draws</small>
               </article>
+              <article className="miniCard">
+                <strong>{selectedParticipant.championships}</strong>
+                <small>Championships</small>
+              </article>
+              <article className="miniCard">
+                <strong>{selectedParticipant.runnerUps}</strong>
+                <small>Runner-ups</small>
+              </article>
+              <article className="miniCard">
+                <strong>{selectedParticipant.finals}</strong>
+                <small>Finals</small>
+              </article>
+              <article className="miniCard">
+                <strong>{pct(winRate(selectedParticipant.championships, selectedParticipant.finals))}</strong>
+                <small>Final Conversion</small>
+              </article>
+              <article className="miniCard">
+                <strong>{pct(winRate(selectedParticipant.wins, selectedParticipant.played))}</strong>
+                <small>Overall Win Rate</small>
+              </article>
+              <article className="miniCard">
+                <strong>
+                  {pct(
+                    winRate(
+                      selectedParticipant.stageStats.group.wins,
+                      selectedParticipant.stageStats.group.played,
+                    ),
+                  )}
+                </strong>
+                <small>Group Stage Win Rate</small>
+              </article>
+              <article className="miniCard">
+                <strong>
+                  {pct(
+                    winRate(
+                      selectedParticipant.stageStats.knockout.wins,
+                      selectedParticipant.stageStats.knockout.played,
+                    ),
+                  )}
+                </strong>
+                <small>Knockout Win Rate</small>
+              </article>
+              <article className="miniCard">
+                <strong>
+                  {pct(
+                    winRate(
+                      selectedParticipant.stageStats.swiss.wins,
+                      selectedParticipant.stageStats.swiss.played,
+                    ),
+                  )}
+                </strong>
+                <small>Swiss Win Rate</small>
+              </article>
+              <article className="miniCard">
+                <strong>
+                  {pct(
+                    winRate(
+                      selectedParticipant.stageStats.league.wins,
+                      selectedParticipant.stageStats.league.played,
+                    ),
+                  )}
+                </strong>
+                <small>League Win Rate</small>
+              </article>
             </div>
             <h4>Head-to-head</h4>
             {selectedOpponents.length ? (
               <SortableTable data={opponentRows} columns={opponentColumns} />
             ) : (
               <p>No opponent history yet for this participant.</p>
+            )}
+            <h4>By Tournament Type</h4>
+            {selectedByFormat.length ? (
+              <SortableTable data={selectedByFormat} columns={formatColumns} />
+            ) : (
+              <p>No tournament-type breakdown available yet.</p>
             )}
           </section>
         </div>

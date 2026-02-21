@@ -15,6 +15,7 @@ import { maybeGenerateSwissRound } from "../formats/swiss";
 import { StorageService } from "../storage";
 import {
   SCHEMA_VERSION,
+  type MatchStage,
   type Match,
   type NewTournamentInput,
   type Participant,
@@ -22,6 +23,7 @@ import {
   type Tournament,
 } from "../types";
 import { makeId } from "../utils/id";
+import { getTournamentChampionId, getTournamentRunnerUpId } from "../utils/champion";
 
 type Store = {
   tournaments: Tournament[];
@@ -81,6 +83,18 @@ function ensureHistoryEntry(
     if (existing.name !== name) existing.name = name;
     if (!existing.opponents) existing.opponents = {};
     if (typeof existing.tournaments !== "number") existing.tournaments = 0;
+    if (typeof existing.completedTournaments !== "number") existing.completedTournaments = 0;
+    if (typeof existing.championships !== "number") existing.championships = 0;
+    if (typeof existing.runnerUps !== "number") existing.runnerUps = 0;
+    if (typeof existing.finals !== "number") existing.finals = 0;
+    if (!existing.stageStats) {
+      existing.stageStats = {
+        group: { played: 0, wins: 0, losses: 0, draws: 0 },
+        knockout: { played: 0, wins: 0, losses: 0, draws: 0 },
+        swiss: { played: 0, wins: 0, losses: 0, draws: 0 },
+        league: { played: 0, wins: 0, losses: 0, draws: 0 },
+      };
+    }
     return existing;
   }
   const created: ParticipantHistory = {
@@ -90,10 +104,27 @@ function ensureHistoryEntry(
     draws: 0,
     played: 0,
     tournaments: 0,
+    completedTournaments: 0,
+    championships: 0,
+    runnerUps: 0,
+    finals: 0,
+    stageStats: {
+      group: { played: 0, wins: 0, losses: 0, draws: 0 },
+      knockout: { played: 0, wins: 0, losses: 0, draws: 0 },
+      swiss: { played: 0, wins: 0, losses: 0, draws: 0 },
+      league: { played: 0, wins: 0, losses: 0, draws: 0 },
+    },
     opponents: {},
   };
   history[key] = created;
   return created;
+}
+
+function stageKey(stage: MatchStage): keyof ParticipantHistory["stageStats"] {
+  if (stage === "GROUP") return "group";
+  if (stage === "KNOCKOUT") return "knockout";
+  if (stage === "SWISS") return "swiss";
+  return "league";
 }
 
 function deriveHistoryFromTournaments(
@@ -114,6 +145,9 @@ function deriveHistoryFromTournaments(
       seenThisTournament.add(key);
       const entry = ensureHistoryEntry(history, name);
       entry.tournaments += 1;
+      if (tournament.status === "COMPLETED") {
+        entry.completedTournaments += 1;
+      }
     }
 
     for (const match of tournament.matches) {
@@ -126,9 +160,12 @@ function deriveHistoryFromTournaments(
       const b = ensureHistoryEntry(history, playerBName);
       const aVsKey = historyKey(playerBName);
       const bVsKey = historyKey(playerAName);
+      const stage = stageKey(match.stage);
 
       a.played += 1;
       b.played += 1;
+      a.stageStats[stage].played += 1;
+      b.stageStats[stage].played += 1;
 
       const aVs = a.opponents[aVsKey] ?? {
         opponentName: playerBName,
@@ -151,22 +188,50 @@ function deriveHistoryFromTournaments(
       if (match.winner === undefined) {
         a.draws += 1;
         b.draws += 1;
+        a.stageStats[stage].draws += 1;
+        b.stageStats[stage].draws += 1;
         aVs.draws += 1;
         bVs.draws += 1;
       } else if (match.winner === match.playerA) {
         a.wins += 1;
         b.losses += 1;
+        a.stageStats[stage].wins += 1;
+        b.stageStats[stage].losses += 1;
         aVs.wins += 1;
         bVs.losses += 1;
       } else if (match.winner === match.playerB) {
         b.wins += 1;
         a.losses += 1;
+        b.stageStats[stage].wins += 1;
+        a.stageStats[stage].losses += 1;
         bVs.wins += 1;
         aVs.losses += 1;
       }
 
       a.opponents[aVsKey] = aVs;
       b.opponents[bVsKey] = bVs;
+    }
+
+    if (tournament.status === "COMPLETED") {
+      const championId = getTournamentChampionId(tournament);
+      if (championId) {
+        const championName = idToName.get(championId);
+        if (championName) {
+          const championEntry = ensureHistoryEntry(history, championName);
+          championEntry.championships += 1;
+          championEntry.finals += 1;
+        }
+      }
+
+      const runnerUpId = getTournamentRunnerUpId(tournament);
+      if (runnerUpId) {
+        const runnerUpName = idToName.get(runnerUpId);
+        if (runnerUpName) {
+          const runnerUpEntry = ensureHistoryEntry(history, runnerUpName);
+          runnerUpEntry.runnerUps += 1;
+          runnerUpEntry.finals += 1;
+        }
+      }
     }
   }
 
