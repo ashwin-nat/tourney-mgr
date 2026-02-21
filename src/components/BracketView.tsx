@@ -26,6 +26,13 @@ function outcomeFor(match: Match, participantId: string): "win" | "loss" | "draw
   return match.winner === participantId ? "win" : "loss";
 }
 
+function outcomeIcon(outcome: ReturnType<typeof outcomeFor>): string {
+  if (outcome === "win") return "✅";
+  if (outcome === "loss") return "❌";
+  if (outcome === "draw") return "🤝";
+  return "⏳";
+}
+
 export function BracketView({
   tournament,
   onSimulateMatch,
@@ -73,48 +80,48 @@ export function BracketView({
                     : undefined;
 
                   return (
-                    <div key={m.id} className="miniCard">
+                    <div key={m.id} className="miniCard matchCard">
                       <div className="nameRow">
                         <span>{participantName(tournament, m.playerA)}</span>
-                        {outcomeFor(m, m.playerA) === "win" && (
-                          <span className="resultMark win">[W]</span>
-                        )}
-                        {outcomeFor(m, m.playerA) === "loss" && (
-                          <span className="resultMark loss">[L]</span>
-                        )}
+                        <span
+                          className={`resultMark ${outcomeFor(m, m.playerA)}`}
+                          title={outcomeFor(m, m.playerA)}
+                        >
+                          {outcomeIcon(outcomeFor(m, m.playerA))}
+                        </span>
                       </div>
                       <div className="nameRow">
                         <span>{participantName(tournament, m.playerB)}</span>
-                        {outcomeFor(m, m.playerB) === "win" && (
-                          <span className="resultMark win">[W]</span>
-                        )}
-                        {outcomeFor(m, m.playerB) === "loss" && (
-                          <span className="resultMark loss">[L]</span>
-                        )}
+                        <span
+                          className={`resultMark ${outcomeFor(m, m.playerB)}`}
+                          title={outcomeFor(m, m.playerB)}
+                        >
+                          {outcomeIcon(outcomeFor(m, m.playerB))}
+                        </span>
                       </div>
-                      {m.groupId && <small>Group {m.groupId}</small>}
-                      {!m.played && <small>Pending</small>}
-                      {m.played && !m.winner && <small>Draw</small>}
+                      <small className="matchMeta">
+                        {m.groupId ? `👥 ${m.groupId}` : ""}
+                        {!m.played ? " ⏳ Pending" : ""}
+                        {m.played && !m.winner ? " 🤝 Draw" : ""}
+                      </small>
                       {!m.played && (
-                        <button onClick={() => onSimulateMatch(m.id)}>Simulate</button>
+                        <button onClick={() => onSimulateMatch(m.id)}>🎲 Sim</button>
                       )}
                       {m.playerA !== BYE_ID && m.playerB !== BYE_ID && (
-                        <div className="row">
+                        <div className="row actionRow">
                           <button
                             disabled={manualResultDisabled}
                             title={manualResultReason}
                             onClick={() => onSetMatchResult(m.id, m.playerA)}
                           >
-                            {m.played ? "Set Winner" : "Record"}{" "}
-                            {participantName(tournament, m.playerA)}
+                            🟢 {participantName(tournament, m.playerA)}
                           </button>
                           <button
                             disabled={manualResultDisabled}
                             title={manualResultReason}
                             onClick={() => onSetMatchResult(m.id, m.playerB)}
                           >
-                            {m.played ? "Set Winner" : "Record"}{" "}
-                            {participantName(tournament, m.playerB)}
+                            🟢 {participantName(tournament, m.playerB)}
                           </button>
                         </div>
                       )}

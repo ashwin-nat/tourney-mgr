@@ -1,6 +1,7 @@
 import { buildStandings } from "../engine/standings";
 import type { ParticipantHistory, Tournament } from "../types";
 import { BracketView } from "./BracketView";
+import { HeadToHeadMatrix } from "./HeadToHeadMatrix";
 import { StandingsTable } from "./StandingsTable";
 
 type Props = {
@@ -81,30 +82,44 @@ export function TournamentDetail({
         />
       )}
       {tournament.format === "LEAGUE" && (
-        <StandingsTable
-          participants={tournament.participants}
-          standings={tournament.standings}
-          title="League Standings"
-        />
+        <div className="stack">
+          <StandingsTable
+            participants={tournament.participants}
+            standings={tournament.standings}
+            title="League Standings"
+          />
+          <HeadToHeadMatrix
+            title="League Head-to-Head Matrix"
+            participants={tournament.participants}
+            matches={tournament.matches.filter((match) => match.stage === "LEAGUE")}
+          />
+        </div>
       )}
       {tournament.format === "GROUP_KO" &&
-        (tournament.groups ?? []).map((group) => {
-          const groupParticipants = tournament.participants.filter((participant) =>
-            group.participantIds.includes(participant.id),
-          );
-          const standings = buildStandings(
-            groupParticipants,
-            groupStageMatches.filter((match) => match.groupId === group.id),
-          );
-          return (
-            <StandingsTable
-              key={group.id}
-              participants={groupParticipants}
-              standings={standings}
-              title={`Group ${group.id} Standings`}
-            />
-          );
-        })}
+        <div className="groupsGrid">
+          {(tournament.groups ?? []).map((group) => {
+            const groupParticipants = tournament.participants.filter((participant) =>
+              group.participantIds.includes(participant.id),
+            );
+            const groupMatches = groupStageMatches.filter((match) => match.groupId === group.id);
+            const standings = buildStandings(groupParticipants, groupMatches);
+
+            return (
+              <div key={group.id} className="stack">
+                <StandingsTable
+                  participants={groupParticipants}
+                  standings={standings}
+                  title={`Group ${group.id} Standings`}
+                />
+                <HeadToHeadMatrix
+                  title={`Group ${group.id} Head-to-Head`}
+                  participants={groupParticipants}
+                  matches={groupMatches}
+                />
+              </div>
+            );
+          })}
+        </div>}
       <BracketView
         tournament={tournament}
         onSimulateMatch={onSimulateMatch}

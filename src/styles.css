@@ -172,6 +172,14 @@ button.danger {
   color: #c5223f;
 }
 
+.resultMark.draw {
+  color: #7b8798;
+}
+
+.resultMark.pending {
+  color: #4e6f9a;
+}
+
 .matchRow {
   display: grid;
   grid-template-columns: 1fr auto auto;
@@ -204,7 +212,7 @@ td {
 
 .bracket {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   width: max-content;
 }
 
@@ -213,9 +221,109 @@ td {
 }
 
 .roundCol {
-  min-width: 170px;
+  min-width: 138px;
   display: grid;
+  gap: 6px;
+}
+
+.matchCard {
+  padding: 6px;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.matchCard button {
+  font-size: 0.75rem;
+  padding: 4px 6px;
+}
+
+.matchCard .nameRow {
+  gap: 4px;
+}
+
+.matchMeta {
+  color: #4b647f;
+  min-height: 1rem;
+}
+
+.actionRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin-bottom: 0;
+}
+
+.compactPanel {
+  padding: 10px;
+}
+
+.tableViewport,
+.matrixViewport {
+  overflow-x: auto;
+}
+
+.standingsTable {
+  width: auto;
+  min-width: 320px;
+}
+
+.standingsTable th,
+.standingsTable td {
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+.groupsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 8px;
+}
+
+.matrixTable {
+  width: auto;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.82rem;
+}
+
+.matrixTable th,
+.matrixTable td {
+  border-bottom: 1px solid #d9e4f3;
+  border-right: 1px solid #ecf1f8;
+  padding: 4px 6px;
+  white-space: nowrap;
+  text-align: center;
+  transition: opacity 120ms ease;
+}
+
+.matrixTable th:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #f7fbff;
+  box-shadow: 1px 0 0 #d9e4f3;
+}
+
+.matrixTable tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #f9fcff;
+  box-shadow: 1px 0 0 #d9e4f3;
+}
+
+.matrixTable th {
+  position: static;
+}
+
+.matrixFocused .matrixDimmed {
+  opacity: 0.18;
+}
+
+.diagCell {
+  color: #8ca0b8;
 }
 
 .championBlock {

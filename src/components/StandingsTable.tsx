@@ -42,9 +42,11 @@ export function StandingsTable({ participants, standings, title = "Standings" }:
   );
 
   return (
-    <section className="panel">
+    <section className="panel compactPanel">
       <h3>{title}</h3>
-      <SortableTable data={rows} columns={columns} />
+      <div className="tableViewport">
+        <SortableTable data={rows} columns={columns} className="standingsTable" />
+      </div>
     </section>
   );
 }
