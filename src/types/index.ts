@@ -11,6 +11,14 @@ export type Participant = {
   rating: number;
 };
 
+export type ParticipantHistory = {
+  name: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  played: number;
+};
+
 export type Standing = {
   played: number;
   wins: number;

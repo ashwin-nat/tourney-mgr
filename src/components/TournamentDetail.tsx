@@ -1,9 +1,10 @@
-import type { Tournament } from "../types";
+import type { ParticipantHistory, Tournament } from "../types";
 import { BracketView } from "./BracketView";
 import { StandingsTable } from "./StandingsTable";
 
 type Props = {
   tournament: Tournament;
+  participantHistory: Record<string, ParticipantHistory>;
   onGenerateFixtures: () => void;
   onSimulateMatch: (matchId: string) => void;
   onSimulateRound: (round: number) => void;
@@ -12,13 +13,9 @@ type Props = {
   onRatingChange: (participantId: string, rating: number) => void;
 };
 
-function participantName(t: Tournament, id: string): string {
-  if (id === "BYE") return "BYE";
-  return t.participants.find((p) => p.id === id)?.name ?? "Unknown";
-}
-
 export function TournamentDetail({
   tournament,
+  participantHistory,
   onGenerateFixtures,
   onSimulateMatch,
   onSimulateRound,
@@ -26,9 +23,6 @@ export function TournamentDetail({
   onReset,
   onRatingChange,
 }: Props) {
-  const rounds = [...new Set(tournament.matches.map((m) => m.round))].sort(
-    (a, b) => a - b,
-  );
   const nextRound = tournament.matches.find((m) => !m.played)?.round;
 
   return (
@@ -56,7 +50,7 @@ export function TournamentDetail({
       <h3>Participants</h3>
       <div className="grid">
         {tournament.participants.map((p) => (
-          <label key={p.id} className="miniCard">
+          <label key={p.id} className="miniCard participantCard">
             {p.name}
             <input
               type="number"
@@ -65,43 +59,29 @@ export function TournamentDetail({
               value={p.rating}
               onChange={(e) => onRatingChange(p.id, Number(e.target.value))}
             />
+            {participantHistory[p.name.trim().toLowerCase()] && (
+              <small>
+                Career W-L-D: {participantHistory[p.name.trim().toLowerCase()].wins}-
+                {participantHistory[p.name.trim().toLowerCase()].losses}-
+                {participantHistory[p.name.trim().toLowerCase()].draws}
+              </small>
+            )}
           </label>
         ))}
       </div>
 
-      <h3>Matches</h3>
-      {rounds.map((round) => (
-        <div key={round} className="panel sub">
-          <h4>Round {round}</h4>
-          {tournament.matches
-            .filter((m) => m.round === round)
-            .map((m) => (
-              <div className="matchRow" key={m.id}>
-                <span>
-                  [{m.stage}] {participantName(tournament, m.playerA)} vs{" "}
-                  {participantName(tournament, m.playerB)}
-                  {m.groupId ? ` (Group ${m.groupId})` : ""}
-                </span>
-                <span>
-                  {m.played
-                    ? `${m.scoreA ?? 0}-${m.scoreB ?? 0} | winner: ${
-                        m.winner ? participantName(tournament, m.winner) : "draw"
-                      }`
-                    : "pending"}
-                </span>
-                {!m.played && (
-                  <button onClick={() => onSimulateMatch(m.id)}>Simulate Match</button>
-                )}
-              </div>
-            ))}
-        </div>
-      ))}
-
-      <StandingsTable
+      {tournament.format !== "KNOCKOUT" && (
+        <StandingsTable
+          participants={tournament.participants}
+          standings={tournament.standings}
+        />
+      )}
+      <BracketView
+        format={tournament.format}
         participants={tournament.participants}
-        standings={tournament.standings}
+        matches={tournament.matches}
+        onSimulateMatch={onSimulateMatch}
       />
-      <BracketView participants={tournament.participants} matches={tournament.matches} />
     </section>
   );
 }
