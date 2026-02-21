@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
-import type { MatchStage, ParticipantHistory, Tournament, TournamentFormat } from "../types";
+import type {
+  MatchStage,
+  ParticipantHistory,
+  StatsTransferFile,
+  Tournament,
+  TournamentFormat,
+} from "../types";
 import {
   getTournamentChampionName,
   getTournamentChampionId,
@@ -13,6 +19,8 @@ type Props = {
   participantHistory: Record<string, ParticipantHistory>;
   onOpenTournament: (id: string) => void;
   onClearAll: () => void;
+  onExportStats: () => StatsTransferFile;
+  onImportStats: (input: unknown) => { ok: true } | { ok: false; error: string };
 };
 
 function pct(value: number): string {
@@ -65,7 +73,11 @@ export function HistoryPage({
   participantHistory,
   onOpenTournament,
   onClearAll,
+  onExportStats,
+  onImportStats,
 }: Props) {
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importMessage, setImportMessage] = useState<string>("");
   const [selectedParticipantKey, setSelectedParticipantKey] = useState<string | null>(
     null,
   );
@@ -396,25 +408,71 @@ export function HistoryPage({
     [],
   );
 
+  const downloadStats = () => {
+    const payload = onExportStats();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `tourney-stats-${stamp}.json`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const importStats = async (file: File) => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as unknown;
+      const result = onImportStats(parsed);
+      setImportMessage(result.ok ? "Stats imported." : result.error);
+    } catch {
+      setImportMessage("Failed to read the selected file.");
+    }
+  };
+
   return (
     <section className="panel">
       <div className="row">
         <h2>History & Stats</h2>
-        <button
-          className="danger"
-          onClick={() => {
-            if (
-              window.confirm(
-                "Clear all tournaments and participant history? This cannot be undone.",
-              )
-            ) {
-              onClearAll();
-            }
-          }}
-        >
-          Clear All
-        </button>
+        <div className="row">
+          <button onClick={downloadStats}>Export Stats</button>
+          <button onClick={() => importInputRef.current?.click()}>Import Stats</button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json"
+            style={{ display: "none" }}
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0];
+              if (file) {
+                void importStats(file);
+              }
+              event.currentTarget.value = "";
+            }}
+          />
+          <button
+            className="danger"
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Clear all tournaments and participant history? This cannot be undone.",
+                )
+              ) {
+                onClearAll();
+                setImportMessage("");
+              }
+            }}
+          >
+            Clear All
+          </button>
+        </div>
       </div>
+      {importMessage && <p>{importMessage}</p>}
       <div className="historySummary">
         <article className="miniCard">
           <strong>{tournaments.length}</strong>

@@ -14,7 +14,9 @@ export default function App() {
     createTournament,
     selectTournament,
     deleteTournament,
+    exportStats,
     generateFixtures,
+    importStats,
     simulateMatch,
     setMatchResult,
     simulateRound,
@@ -69,7 +71,11 @@ export default function App() {
       {page === "TOURNAMENTS" ? (
         <section className="layout">
           <aside>
-            <CreateTournamentForm onCreate={createTournament} historyNames={historyNames} />
+            <CreateTournamentForm
+              onCreate={createTournament}
+              historyNames={historyNames}
+              previousParticipants={tournaments[0]?.participants ?? []}
+            />
             <TournamentList
               tournaments={tournaments}
               currentId={currentTournamentId}
@@ -106,6 +112,8 @@ export default function App() {
         <HistoryPage
           tournaments={tournaments}
           participantHistory={participantHistory}
+          onExportStats={exportStats}
+          onImportStats={importStats}
           onClearAll={clearAll}
           onOpenTournament={(id) => {
             selectTournament(id);

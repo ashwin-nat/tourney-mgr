@@ -20,6 +20,7 @@ import {
   type NewTournamentInput,
   type Participant,
   type ParticipantHistory,
+  type StatsTransferFile,
   type Tournament,
 } from "../types";
 import { makeId } from "../utils/id";
@@ -39,6 +40,8 @@ type Store = {
     participantId: string,
     rating: number,
   ) => void;
+  exportStats: () => StatsTransferFile;
+  importStats: (input: unknown) => { ok: true } | { ok: false; error: string };
   generateFixtures: (id: string) => void;
   simulateMatch: (id: string, matchId: string) => void;
   setMatchResult: (id: string, matchId: string, winnerId: string) => void;
@@ -52,6 +55,28 @@ type PersistedSlice = Pick<
   Store,
   "tournaments" | "participantHistory" | "currentTournamentId"
 >;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function parseStatsTransferFile(input: unknown): StatsTransferFile | null {
+  if (!isRecord(input)) return null;
+  const tournaments = input.tournaments;
+  if (!Array.isArray(tournaments)) return null;
+  const currentTournamentId = input.currentTournamentId;
+  if (currentTournamentId !== null && typeof currentTournamentId !== "string") return null;
+  const participantHistory = input.participantHistory;
+  if (!isRecord(participantHistory)) return null;
+  return {
+    schemaVersion:
+      typeof input.schemaVersion === "number" ? input.schemaVersion : SCHEMA_VERSION,
+    exportedAt: typeof input.exportedAt === "string" ? input.exportedAt : "",
+    tournaments: tournaments as Tournament[],
+    participantHistory: participantHistory as Record<string, ParticipantHistory>,
+    currentTournamentId,
+  };
+}
 
 function clampRating(v: number): number {
   return Math.max(0, Math.min(100, v));
@@ -404,6 +429,44 @@ export const useTournamentStore = create<Store>((set, get) => ({
         participantHistory: deriveHistoryFromTournaments(tournaments),
       };
     });
+  },
+
+  exportStats() {
+    const state = get();
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      exportedAt: new Date().toISOString(),
+      tournaments: state.tournaments,
+      participantHistory: state.participantHistory,
+      currentTournamentId: state.currentTournamentId,
+    };
+  },
+
+  importStats(input) {
+    const parsed = parseStatsTransferFile(input);
+    if (!parsed) return { ok: false, error: "Invalid stats file format." };
+    const tournaments = parsed.tournaments.map((tournament) => ({
+      ...tournament,
+      schemaVersion: tournament.schemaVersion ?? SCHEMA_VERSION,
+    }));
+    const participantHistoryFromTournaments = deriveHistoryFromTournaments(tournaments);
+    const participantHistory =
+      Object.keys(participantHistoryFromTournaments).length > 0
+        ? participantHistoryFromTournaments
+        : parsed.participantHistory;
+    const currentTournamentId = tournaments.some(
+      (tournament) => tournament.id === parsed.currentTournamentId,
+    )
+      ? parsed.currentTournamentId
+      : tournaments[0]?.id ?? null;
+    const next = {
+      tournaments,
+      participantHistory,
+      currentTournamentId,
+    };
+    set(next);
+    void persist(next);
+    return { ok: true };
   },
 
   generateFixtures(id) {

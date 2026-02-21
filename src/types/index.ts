@@ -101,3 +101,11 @@ export type NewTournamentInput = {
   participants: Participant[];
   settings: TournamentSettings;
 };
+
+export type StatsTransferFile = {
+  schemaVersion: number;
+  exportedAt: string;
+  tournaments: Tournament[];
+  participantHistory: Record<string, ParticipantHistory>;
+  currentTournamentId: string | null;
+};

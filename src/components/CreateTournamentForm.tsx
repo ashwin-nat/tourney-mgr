@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { NewTournamentInput, Participant, TournamentFormat } from "../types";
 import { makeId } from "../utils/id";
 
 type Props = {
   onCreate: (input: NewTournamentInput) => void;
   historyNames: string[];
+  previousParticipants: Participant[];
 };
 
 type DraftParticipant = {
@@ -49,7 +50,22 @@ function makeDefaultName(format: TournamentFormat): string {
   return `${formatLabel(format)} ${timestampLabel(new Date())}`;
 }
 
-export function CreateTournamentForm({ onCreate, historyNames }: Props) {
+function formatParticipantsForBulkEdit(participants: Array<Pick<Participant, "name" | "rating">>): string {
+  return participants
+    .filter((participant) => participant.name.trim())
+    .map((participant) => `${participant.name.trim()},${participant.rating}`)
+    .join("\n");
+}
+
+export function CreateTournamentForm({
+  onCreate,
+  historyNames,
+  previousParticipants,
+}: Props) {
+  const previousParticipantsRaw = useMemo(
+    () => formatParticipantsForBulkEdit(previousParticipants),
+    [previousParticipants],
+  );
   const [format, setFormat] = useState<TournamentFormat>("KNOCKOUT");
   const [lastAutoName, setLastAutoName] = useState(() => makeDefaultName("KNOCKOUT"));
   const [name, setName] = useState(() => lastAutoName);
@@ -57,7 +73,7 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
     createDraftParticipant(),
     createDraftParticipant(),
   ]);
-  const [participantsRaw, setParticipantsRaw] = useState("");
+  const [participantsRaw, setParticipantsRaw] = useState(previousParticipantsRaw);
   const [groupCount, setGroupCount] = useState(2);
   const [advancePerGroup, setAdvancePerGroup] = useState(2);
   const [rounds, setRounds] = useState(5);
@@ -79,6 +95,10 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
         return true;
       });
   }, [draftParticipants]);
+
+  useEffect(() => {
+    setParticipantsRaw(previousParticipantsRaw);
+  }, [previousParticipantsRaw]);
 
   return (
     <section className="panel">
@@ -251,6 +271,20 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
           >
             Apply Bulk List
           </button>
+          <button
+            onClick={() =>
+              setParticipantsRaw(
+                formatParticipantsForBulkEdit(
+                  draftParticipants.map((participant) => ({
+                    name: participant.name,
+                    rating: participant.rating,
+                  })),
+                ),
+              )
+            }
+          >
+            Refresh from Interactive List
+          </button>
         </details>
         <button
           onClick={() => {
@@ -274,7 +308,7 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
             setName(nextAutoName);
             setLastAutoName(nextAutoName);
             setDraftParticipants([createDraftParticipant(), createDraftParticipant()]);
-            setParticipantsRaw("");
+            setParticipantsRaw(previousParticipantsRaw);
             setFaceOpponentsTwice(false);
           }}
           disabled={participants.length < 2}
