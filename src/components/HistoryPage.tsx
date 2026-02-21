@@ -85,12 +85,19 @@ export function HistoryPage({
               <th>W</th>
               <th>D</th>
               <th>L</th>
+              <th>T</th>
               <th>Win%</th>
+              <th>Vs Opponents</th>
             </tr>
           </thead>
           <tbody>
             {participants.map((entry) => {
               const winRate = entry.played ? (entry.wins / entry.played) * 100 : 0;
+              const opponents = Object.values(entry.opponents ?? {}).sort((a, b) => {
+                if (b.wins !== a.wins) return b.wins - a.wins;
+                if (b.played !== a.played) return b.played - a.played;
+                return a.opponentName.localeCompare(b.opponentName);
+              });
               return (
                 <tr key={entry.name.toLowerCase()}>
                   <td>{entry.name}</td>
@@ -98,7 +105,49 @@ export function HistoryPage({
                   <td>{entry.wins}</td>
                   <td>{entry.draws}</td>
                   <td>{entry.losses}</td>
+                  <td>{entry.tournaments}</td>
                   <td>{pct(winRate)}</td>
+                  <td>
+                    {opponents.length ? (
+                      <details>
+                        <summary>{opponents.length} opponents</summary>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Opponent</th>
+                              <th>P</th>
+                              <th>W</th>
+                              <th>D</th>
+                              <th>L</th>
+                              <th>Win%</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {opponents.map((opponent) => (
+                              <tr
+                                key={`${entry.name.toLowerCase()}-${opponent.opponentName.toLowerCase()}`}
+                              >
+                                <td>{opponent.opponentName}</td>
+                                <td>{opponent.played}</td>
+                                <td>{opponent.wins}</td>
+                                <td>{opponent.draws}</td>
+                                <td>{opponent.losses}</td>
+                                <td>
+                                  {pct(
+                                    opponent.played
+                                      ? (opponent.wins / opponent.played) * 100
+                                      : 0,
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </details>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
                 </tr>
               );
             })}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CreateTournamentForm } from "./components/CreateTournamentForm";
 import { HistoryPage } from "./components/HistoryPage";
 import { TournamentDetail } from "./components/TournamentDetail";
@@ -22,7 +22,13 @@ export default function App() {
     resetTournament,
     clearAll,
     updateParticipantRating,
+    hydrate,
+    isHydrated,
   } = useTournamentStore();
+
+  useEffect(() => {
+    void hydrate();
+  }, [hydrate]);
 
   const current = tournaments.find((t) => t.id === currentTournamentId) ?? null;
   const historyNames = useMemo(
@@ -32,6 +38,17 @@ export default function App() {
         .sort((a, b) => a.localeCompare(b)),
     [participantHistory],
   );
+
+  if (!isHydrated) {
+    return (
+      <main className="pageRoot">
+        <section className="panel">
+          <h2>Loading</h2>
+          <p>Reading tournament history...</p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="pageRoot">

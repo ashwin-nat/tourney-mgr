@@ -17,6 +17,16 @@ export type ParticipantHistory = {
   losses: number;
   draws: number;
   played: number;
+  tournaments: number;
+  opponents: Record<string, HeadToHeadHistory>;
+};
+
+export type HeadToHeadHistory = {
+  opponentName: string;
+  wins: number;
+  losses: number;
+  draws: number;
+  played: number;
 };
 
 export type Standing = {

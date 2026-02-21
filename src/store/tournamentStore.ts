@@ -16,8 +16,8 @@ import {
   SCHEMA_VERSION,
   type Match,
   type NewTournamentInput,
-  type ParticipantHistory,
   type Participant,
+  type ParticipantHistory,
   type Tournament,
 } from "../types";
 import { makeId } from "../utils/id";
@@ -26,6 +26,8 @@ type Store = {
   tournaments: Tournament[];
   participantHistory: Record<string, ParticipantHistory>;
   currentTournamentId: string | null;
+  isHydrated: boolean;
+  hydrate: () => Promise<void>;
   selectTournament: (id: string) => void;
   createTournament: (input: NewTournamentInput) => void;
   deleteTournament: (id: string) => void;
@@ -42,6 +44,11 @@ type Store = {
   resetTournament: (id: string) => void;
   clearAll: () => void;
 };
+
+type PersistedSlice = Pick<
+  Store,
+  "tournaments" | "participantHistory" | "currentTournamentId"
+>;
 
 function clampRating(v: number): number {
   return Math.max(0, Math.min(100, v));
@@ -62,74 +69,119 @@ function historyKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
-function mergeParticipantHistory(
-  current: Record<string, ParticipantHistory>,
-  tournament: Tournament,
-  matches: Match[],
-): Record<string, ParticipantHistory> {
-  if (!matches.length) return current;
-
-  const idToName = new Map(
-    tournament.participants.map((participant) => [participant.id, participant.name]),
-  );
-  const next = { ...current };
-
-  const ensure = (participantId: string): ParticipantHistory | null => {
-    const name = idToName.get(participantId)?.trim();
-    if (!name) return null;
-    const key = historyKey(name);
-    const existing = next[key];
-    if (!existing) {
-      next[key] = { name, wins: 0, losses: 0, draws: 0, played: 0 };
-      return next[key];
-    }
-    if (existing.name !== name) {
-      next[key] = { ...existing, name };
-    }
-    return next[key];
+function ensureHistoryEntry(
+  history: Record<string, ParticipantHistory>,
+  participantName: string,
+): ParticipantHistory {
+  const name = participantName.trim();
+  const key = historyKey(name);
+  const existing = history[key];
+  if (existing) {
+    if (existing.name !== name) existing.name = name;
+    if (!existing.opponents) existing.opponents = {};
+    if (typeof existing.tournaments !== "number") existing.tournaments = 0;
+    return existing;
+  }
+  const created: ParticipantHistory = {
+    name,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    played: 0,
+    tournaments: 0,
+    opponents: {},
   };
+  history[key] = created;
+  return created;
+}
 
-  for (const match of matches) {
-    if (!match.played) continue;
-    const a = ensure(match.playerA);
-    const b = ensure(match.playerB);
-    if (!a || !b) continue;
+function deriveHistoryFromTournaments(
+  tournaments: Tournament[],
+): Record<string, ParticipantHistory> {
+  const history: Record<string, ParticipantHistory> = {};
 
-    a.played += 1;
-    b.played += 1;
-    if (match.winner === undefined) {
-      a.draws += 1;
-      b.draws += 1;
-      continue;
+  for (const tournament of tournaments) {
+    const idToName = new Map(
+      tournament.participants.map((participant) => [participant.id, participant.name.trim()]),
+    );
+    const seenThisTournament = new Set<string>();
+    for (const participant of tournament.participants) {
+      const name = participant.name.trim();
+      if (!name) continue;
+      const key = historyKey(name);
+      if (seenThisTournament.has(key)) continue;
+      seenThisTournament.add(key);
+      const entry = ensureHistoryEntry(history, name);
+      entry.tournaments += 1;
     }
-    if (match.winner === match.playerA) {
-      a.wins += 1;
-      b.losses += 1;
-    } else if (match.winner === match.playerB) {
-      b.wins += 1;
-      a.losses += 1;
+
+    for (const match of tournament.matches) {
+      if (!match.played) continue;
+      const playerAName = idToName.get(match.playerA);
+      const playerBName = idToName.get(match.playerB);
+      if (!playerAName || !playerBName) continue;
+
+      const a = ensureHistoryEntry(history, playerAName);
+      const b = ensureHistoryEntry(history, playerBName);
+      const aVsKey = historyKey(playerBName);
+      const bVsKey = historyKey(playerAName);
+
+      a.played += 1;
+      b.played += 1;
+
+      const aVs = a.opponents[aVsKey] ?? {
+        opponentName: playerBName,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        played: 0,
+      };
+      const bVs = b.opponents[bVsKey] ?? {
+        opponentName: playerAName,
+        wins: 0,
+        losses: 0,
+        draws: 0,
+        played: 0,
+      };
+
+      aVs.played += 1;
+      bVs.played += 1;
+
+      if (match.winner === undefined) {
+        a.draws += 1;
+        b.draws += 1;
+        aVs.draws += 1;
+        bVs.draws += 1;
+      } else if (match.winner === match.playerA) {
+        a.wins += 1;
+        b.losses += 1;
+        aVs.wins += 1;
+        bVs.losses += 1;
+      } else if (match.winner === match.playerB) {
+        b.wins += 1;
+        a.losses += 1;
+        bVs.wins += 1;
+        aVs.losses += 1;
+      }
+
+      a.opponents[aVsKey] = aVs;
+      b.opponents[bVsKey] = bVs;
     }
   }
 
-  return next;
-}
-
-function persist(
-  state: Pick<Store, "tournaments" | "currentTournamentId" | "participantHistory">,
-): void {
-  StorageService.saveTournaments(state.tournaments, state.participantHistory);
-  StorageService.saveCurrentTournament(state.currentTournamentId);
+  return history;
 }
 
 function runFormatProgression(tournament: Tournament): Tournament {
-  let next = tournament;
+  const next = { ...tournament };
   if (next.format === "GROUP_KO") {
-    next = maybeStartKnockoutAfterGroups(next);
-    next = maybeGenerateNextKnockoutRound(next);
+    const afterGroups = maybeStartKnockoutAfterGroups(next);
+    const afterKnockout = maybeGenerateNextKnockoutRound(afterGroups);
+    Object.assign(next, afterKnockout);
   } else if (next.format === "KNOCKOUT") {
-    next = maybeGenerateNextKnockoutRound(next);
+    Object.assign(next, maybeGenerateNextKnockoutRound(next));
   } else if (next.format === "SWISS") {
-    next = maybeGenerateSwissRound(next);
+    Object.assign(next, maybeGenerateSwissRound(next));
   }
 
   const stageMatches = next.matches.filter((m) => m.stage !== "KNOCKOUT" || m.played);
@@ -166,48 +218,67 @@ function applyManualMatchResult(
   return runFormatProgression({ ...tournament, matches, status: "IN_PROGRESS" });
 }
 
-function deriveHistoryFromTournaments(
-  tournaments: Tournament[],
-): Record<string, ParticipantHistory> {
-  let history: Record<string, ParticipantHistory> = {};
-  for (const tournament of tournaments) {
-    history = mergeParticipantHistory(
-      history,
-      tournament,
-      tournament.matches.filter((match) => match.played),
-    );
-  }
-  return history;
+async function persist(state: PersistedSlice): Promise<void> {
+  await StorageService.saveState(
+    state.tournaments,
+    state.participantHistory,
+    state.currentTournamentId,
+  );
 }
 
-function initializeTournaments(): Pick<
-  Store,
-  "tournaments" | "currentTournamentId" | "participantHistory"
-> {
-  const tournaments = StorageService.loadTournaments().map((t) => ({
-    ...t,
-    schemaVersion: t.schemaVersion ?? SCHEMA_VERSION,
-  }));
-  const currentTournamentId = StorageService.loadCurrentTournament();
-  const loadedHistory = StorageService.loadParticipantHistory();
-  const participantHistory =
-    Object.keys(loadedHistory).length > 0
-      ? loadedHistory
-      : deriveHistoryFromTournaments(tournaments);
-  return { tournaments, currentTournamentId, participantHistory };
+function applyAndPersist(
+  get: () => Store,
+  set: (partial: Partial<Store>) => void,
+  update: (state: Store) => PersistedSlice,
+): void {
+  const state = get();
+  const next = update(state);
+  set(next);
+  void persist(next);
 }
 
-export const useTournamentStore = create<Store>((set, get) => {
-  const initial = initializeTournaments();
-  return {
-    ...initial,
-    selectTournament(id) {
-      const state = get();
-      const next = { ...state, currentTournamentId: id };
-      persist(next);
-      set({ currentTournamentId: id });
-    },
-    createTournament(input) {
+export const useTournamentStore = create<Store>((set, get) => ({
+  tournaments: [],
+  participantHistory: {},
+  currentTournamentId: null,
+  isHydrated: false,
+
+  async hydrate() {
+    if (get().isHydrated) return;
+    try {
+      const loaded = await StorageService.loadState();
+      const tournaments = loaded.tournaments.map((tournament) => ({
+        ...tournament,
+        schemaVersion: tournament.schemaVersion ?? SCHEMA_VERSION,
+      }));
+      const derivedHistory = deriveHistoryFromTournaments(tournaments);
+      const participantHistory =
+        Object.keys(derivedHistory).length > 0 ? derivedHistory : loaded.participantHistory;
+      const currentTournamentId = tournaments.some((t) => t.id === loaded.currentTournamentId)
+        ? loaded.currentTournamentId
+        : tournaments[0]?.id ?? null;
+      const next = {
+        tournaments,
+        participantHistory,
+        currentTournamentId,
+      };
+      set({ ...next, isHydrated: true });
+      void persist(next);
+    } catch {
+      set({ isHydrated: true });
+    }
+  },
+
+  selectTournament(id) {
+    applyAndPersist(get, set, (state) => ({
+      tournaments: state.tournaments,
+      participantHistory: state.participantHistory,
+      currentTournamentId: id,
+    }));
+  },
+
+  createTournament(input) {
+    applyAndPersist(get, set, (state) => {
       const participants = validateParticipants(
         input.participants.map((p) => ({ ...p, id: p.id || makeId("p") })),
       );
@@ -221,29 +292,33 @@ export const useTournamentStore = create<Store>((set, get) => {
         status: "NOT_STARTED",
         schemaVersion: SCHEMA_VERSION,
       };
-      const tournaments = [tournament, ...get().tournaments];
-      const next = {
+      const tournaments = [tournament, ...state.tournaments];
+      return {
         tournaments,
         currentTournamentId: tournament.id,
-        participantHistory: get().participantHistory,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
       };
-      persist(next);
-      set(next);
-    },
-    deleteTournament(id) {
-      const tournaments = get().tournaments.filter((t) => t.id !== id);
+    });
+  },
+
+  deleteTournament(id) {
+    applyAndPersist(get, set, (state) => {
+      const tournaments = state.tournaments.filter((t) => t.id !== id);
       const currentTournamentId =
-        get().currentTournamentId === id ? tournaments[0]?.id ?? null : get().currentTournamentId;
-      const next = {
+        state.currentTournamentId === id
+          ? tournaments[0]?.id ?? null
+          : state.currentTournamentId;
+      return {
         tournaments,
         currentTournamentId,
-        participantHistory: get().participantHistory,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
       };
-      persist(next);
-      set(next);
-    },
-    updateParticipantRating(tournamentId, participantId, rating) {
-      const tournaments = get().tournaments.map((t) => {
+    });
+  },
+
+  updateParticipantRating(tournamentId, participantId, rating) {
+    applyAndPersist(get, set, (state) => {
+      const tournaments = state.tournaments.map((t) => {
         if (t.id !== tournamentId) return t;
         return {
           ...t,
@@ -252,16 +327,17 @@ export const useTournamentStore = create<Store>((set, get) => {
           ),
         };
       });
-      const next = {
+      return {
         tournaments,
-        currentTournamentId: get().currentTournamentId,
-        participantHistory: get().participantHistory,
+        currentTournamentId: state.currentTournamentId,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
       };
-      persist(next);
-      set({ tournaments });
-    },
-    generateFixtures(id) {
-      const tournaments = get().tournaments.map((t) => {
+    });
+  },
+
+  generateFixtures(id) {
+    applyAndPersist(get, set, (state) => {
+      const tournaments = state.tournaments.map((t) => {
         if (t.id !== id) return t;
         let matches: Match[] = [];
         let groups = t.groups;
@@ -269,110 +345,75 @@ export const useTournamentStore = create<Store>((set, get) => {
           matches = generateKnockoutRoundOne(t.participants, t.settings.randomSeed);
         } else if (t.format === "GROUP_KO") {
           const groupCount = Math.max(2, t.settings.groupCount ?? 2);
-          groups = createBalancedGroups(
-            t.participants,
-            groupCount,
-            t.settings.randomSeed,
-          );
+          groups = createBalancedGroups(t.participants, groupCount, t.settings.randomSeed);
           matches = generateGroupStageMatches(groups);
         } else {
           const seeded = maybeGenerateSwissRound({ ...t, matches: [] });
           matches = seeded.matches;
         }
-        const seeded = runFormatProgression({
+        return runFormatProgression({
           ...t,
           groups,
           matches,
           status: matches.length ? "IN_PROGRESS" : "NOT_STARTED",
         });
-        return seeded;
       });
-      const next = {
+      return {
         tournaments,
-        currentTournamentId: get().currentTournamentId,
-        participantHistory: get().participantHistory,
+        currentTournamentId: state.currentTournamentId,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
       };
-      persist(next);
-      set({ tournaments });
-    },
-    simulateMatch(id, matchId) {
-      let participantHistory = get().participantHistory;
-      const tournaments = get().tournaments.map((t) => {
-        if (t.id !== id) return t;
-        const nextTournament = applyMatchSimulation(t, [matchId]);
-        const beforePlayed = new Set(
-          t.matches.filter((match) => match.played).map((match) => match.id),
-        );
-        const newlyPlayed = nextTournament.matches.filter(
-          (match) => match.id === matchId && match.played && !beforePlayed.has(match.id),
-        );
-        participantHistory = mergeParticipantHistory(
-          participantHistory,
-          nextTournament,
-          newlyPlayed,
-        );
-        return nextTournament;
-      });
-      const next = {
+    });
+  },
+
+  simulateMatch(id, matchId) {
+    applyAndPersist(get, set, (state) => {
+      const tournaments = state.tournaments.map((t) =>
+        t.id === id ? applyMatchSimulation(t, [matchId]) : t,
+      );
+      return {
         tournaments,
-        currentTournamentId: get().currentTournamentId,
-        participantHistory,
+        currentTournamentId: state.currentTournamentId,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
       };
-      persist(next);
-      set({ tournaments, participantHistory });
-    },
-    setMatchResult(id, matchId, winnerId) {
-      const tournaments = get().tournaments.map((t) => {
-        if (t.id !== id) return t;
-        return applyManualMatchResult(t, matchId, winnerId);
-      });
-      const participantHistory = deriveHistoryFromTournaments(tournaments);
-      const next = {
+    });
+  },
+
+  setMatchResult(id, matchId, winnerId) {
+    applyAndPersist(get, set, (state) => {
+      const tournaments = state.tournaments.map((t) =>
+        t.id === id ? applyManualMatchResult(t, matchId, winnerId) : t,
+      );
+      return {
         tournaments,
-        currentTournamentId: get().currentTournamentId,
-        participantHistory,
+        currentTournamentId: state.currentTournamentId,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
       };
-      persist(next);
-      set({ tournaments, participantHistory });
-    },
-    simulateRound(id, round) {
-      let participantHistory = get().participantHistory;
-      const tournaments = get().tournaments.map((t) => {
+    });
+  },
+
+  simulateRound(id, round) {
+    applyAndPersist(get, set, (state) => {
+      const tournaments = state.tournaments.map((t) => {
         if (t.id !== id) return t;
         const matchIds = t.matches
           .filter((m) => !m.played && m.round === round)
           .map((m) => m.id);
-        const nextTournament = applyMatchSimulation(t, matchIds);
-        const beforePlayed = new Set(
-          t.matches.filter((match) => match.played).map((match) => match.id),
-        );
-        const idSet = new Set(matchIds);
-        const newlyPlayed = nextTournament.matches.filter(
-          (match) => idSet.has(match.id) && match.played && !beforePlayed.has(match.id),
-        );
-        participantHistory = mergeParticipantHistory(
-          participantHistory,
-          nextTournament,
-          newlyPlayed,
-        );
-        return nextTournament;
+        return applyMatchSimulation(t, matchIds);
       });
-      const next = {
+      return {
         tournaments,
-        currentTournamentId: get().currentTournamentId,
-        participantHistory,
+        currentTournamentId: state.currentTournamentId,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
       };
-      persist(next);
-      set({ tournaments, participantHistory });
-    },
-    simulateAll(id) {
-      let participantHistory = get().participantHistory;
-      const tournaments = get().tournaments.map((t) => {
+    });
+  },
+
+  simulateAll(id) {
+    applyAndPersist(get, set, (state) => {
+      const tournaments = state.tournaments.map((t) => {
         if (t.id !== id) return t;
         let current = t;
-        const beforePlayed = new Set(
-          t.matches.filter((match) => match.played).map((match) => match.id),
-        );
         for (let guard = 0; guard < 1000; guard += 1) {
           const nextUnplayed = current.matches.find((m) => !m.played);
           if (!nextUnplayed) break;
@@ -383,26 +424,19 @@ export const useTournamentStore = create<Store>((set, get) => {
           current = applyMatchSimulation(current, roundIds);
           if (current.status === "COMPLETED") break;
         }
-        const newlyPlayed = current.matches.filter(
-          (match) => match.played && !beforePlayed.has(match.id),
-        );
-        participantHistory = mergeParticipantHistory(
-          participantHistory,
-          current,
-          newlyPlayed,
-        );
         return current;
       });
-      const next = {
+      return {
         tournaments,
-        currentTournamentId: get().currentTournamentId,
-        participantHistory,
+        currentTournamentId: state.currentTournamentId,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
       };
-      persist(next);
-      set({ tournaments, participantHistory });
-    },
-    resetTournament(id) {
-      const tournaments = get().tournaments.map((t) => {
+    });
+  },
+
+  resetTournament(id) {
+    applyAndPersist(get, set, (state) => {
+      const tournaments = state.tournaments.map((t) => {
         if (t.id !== id) return t;
         return {
           ...t,
@@ -411,22 +445,21 @@ export const useTournamentStore = create<Store>((set, get) => {
           status: "NOT_STARTED" as const,
         };
       });
-      const next = {
+      return {
         tournaments,
-        currentTournamentId: get().currentTournamentId,
-        participantHistory: get().participantHistory,
+        currentTournamentId: state.currentTournamentId,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
       };
-      persist(next);
-      set({ tournaments });
-    },
-    clearAll() {
-      const next = {
-        tournaments: [],
-        currentTournamentId: null,
-        participantHistory: {},
-      };
-      persist(next);
-      set(next);
-    },
-  };
-});
+    });
+  },
+
+  clearAll() {
+    const next = {
+      tournaments: [],
+      currentTournamentId: null,
+      participantHistory: {},
+    };
+    set(next);
+    void persist(next);
+  },
+}));
