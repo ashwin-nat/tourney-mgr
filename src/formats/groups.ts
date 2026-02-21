@@ -3,6 +3,7 @@ import type { Group, Match, Participant, Tournament } from "../types";
 import { makeId } from "../utils/id";
 import { createTournamentRng } from "../utils/rng";
 import { generateKnockoutRoundOne } from "./knockout";
+import { roundRobinPairings } from "./roundRobin";
 
 function shuffleWithSeed<T>(items: T[], seed: number | undefined, label: string): T[] {
   const rng = createTournamentRng(seed, label);
@@ -30,33 +31,10 @@ export function createBalancedGroups(
   return groups;
 }
 
-function roundRobinPairings(ids: string[]): Array<Array<[string, string]>> {
-  if (ids.length < 2) return [];
-  const normalized = [...ids];
-  const hasBye = normalized.length % 2 !== 0;
-  if (hasBye) normalized.push("__ghost__");
-  const rounds: Array<Array<[string, string]>> = [];
-  const n = normalized.length;
-  const slots = [...normalized];
-  for (let round = 0; round < n - 1; round += 1) {
-    const pairs: Array<[string, string]> = [];
-    for (let i = 0; i < n / 2; i += 1) {
-      const a = slots[i];
-      const b = slots[n - 1 - i];
-      if (a !== "__ghost__" && b !== "__ghost__") {
-        pairs.push([a, b]);
-      }
-    }
-    rounds.push(pairs);
-    const fixed = slots[0];
-    const rest = slots.slice(1);
-    rest.unshift(rest.pop()!);
-    slots.splice(0, n, fixed, ...rest);
-  }
-  return rounds;
-}
-
-export function generateGroupStageMatches(groups: Group[]): Match[] {
+export function generateGroupStageMatches(
+  groups: Group[],
+  faceOpponentsTwice = false,
+): Match[] {
   const matches: Match[] = [];
   groups.forEach((group) => {
     const rounds = roundRobinPairings(group.participantIds);
@@ -73,6 +51,21 @@ export function generateGroupStageMatches(groups: Group[]): Match[] {
         });
       });
     });
+    if (faceOpponentsTwice) {
+      rounds.forEach((roundPairs, idx) => {
+        roundPairs.forEach(([playerA, playerB]) => {
+          matches.push({
+            id: makeId("match"),
+            playerA: playerB,
+            playerB: playerA,
+            played: false,
+            round: rounds.length + idx + 1,
+            stage: "GROUP",
+            groupId: group.id,
+          });
+        });
+      });
+    }
   });
   return matches;
 }

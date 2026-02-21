@@ -10,6 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@tanstack/react-table": "^8.21.3",
     "dexie": "^4.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

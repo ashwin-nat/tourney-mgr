@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { BYE_ID, type Match, type Tournament } from "../types";
 import { getTournamentChampionName } from "../utils/champion";
 
@@ -8,13 +9,14 @@ type Props = {
 };
 
 function participantName(tournament: Tournament, id: string): string {
-  if (id === "BYE") return "BYE";
+  if (id === BYE_ID) return "BYE";
   return tournament.participants.find((p) => p.id === id)?.name ?? "Unknown";
 }
 
 function stageLabel(stage: Match["stage"]): string {
   if (stage === "GROUP") return "Group";
   if (stage === "SWISS") return "Swiss";
+  if (stage === "LEAGUE") return "League";
   return "Knockout";
 }
 
@@ -30,7 +32,7 @@ export function BracketView({
   onSetMatchResult,
 }: Props) {
   const { format, matches } = tournament;
-  if (!matches.length) return null;
+  const [leagueRoundPage, setLeagueRoundPage] = useState(0);
   const championName = getTournamentChampionName(tournament);
   const latestRound = Math.max(...matches.map((match) => match.round), 0);
   const roundsForStage = (stage: Match["stage"]) =>
@@ -38,76 +40,95 @@ export function BracketView({
       (a, b) => a - b,
     );
 
-  function renderRoundsForStage(stage: Match["stage"]) {
-    const rounds = roundsForStage(stage);
-    if (!rounds.length) return null;
-    return (
-      <div className="bracket">
-        {rounds.map((round) => (
-          <div key={`${stage}-${round}`} className="roundCol">
-            <h4>
-              {stageLabel(stage)} R{round}
-            </h4>
-            {matches
-              .filter((m) => m.stage === stage && m.round === round)
-              .map((m) => {
-                const manualResultDisabled = m.round !== latestRound;
-                const manualResultReason = manualResultDisabled
-                  ? "Manual recording is only allowed for matches in the latest round."
-                  : undefined;
+  const leagueRounds = useMemo(() => roundsForStage("LEAGUE"), [matches]);
+  const leaguePageSize = 5;
+  const leaguePageCount = Math.max(1, Math.ceil(leagueRounds.length / leaguePageSize));
 
-                return (
-                  <div key={m.id} className="miniCard">
-                    <div className="nameRow">
-                      <span>{participantName(tournament, m.playerA)}</span>
-                      {outcomeFor(m, m.playerA) === "win" && (
-                        <span className="resultMark win">[W]</span>
-                      )}
-                      {outcomeFor(m, m.playerA) === "loss" && (
-                        <span className="resultMark loss">[L]</span>
-                      )}
-                    </div>
-                    <div className="nameRow">
-                      <span>{participantName(tournament, m.playerB)}</span>
-                      {outcomeFor(m, m.playerB) === "win" && (
-                        <span className="resultMark win">[W]</span>
-                      )}
-                      {outcomeFor(m, m.playerB) === "loss" && (
-                        <span className="resultMark loss">[L]</span>
-                      )}
-                    </div>
-                    {m.groupId && <small>Group {m.groupId}</small>}
-                    {!m.played && <small>Pending</small>}
-                    {m.played && !m.winner && <small>Draw</small>}
-                    {!m.played && (
-                      <button onClick={() => onSimulateMatch(m.id)}>Simulate</button>
-                    )}
-                    {m.playerA !== BYE_ID && m.playerB !== BYE_ID && (
-                      <div className="row">
-                        <button
-                          disabled={manualResultDisabled}
-                          title={manualResultReason}
-                          onClick={() => onSetMatchResult(m.id, m.playerA)}
-                        >
-                          {m.played ? "Set Winner" : "Record"} {participantName(tournament, m.playerA)}
-                        </button>
-                        <button
-                          disabled={manualResultDisabled}
-                          title={manualResultReason}
-                          onClick={() => onSetMatchResult(m.id, m.playerB)}
-                        >
-                          {m.played ? "Set Winner" : "Record"} {participantName(tournament, m.playerB)}
-                        </button>
+  useEffect(() => {
+    setLeagueRoundPage(0);
+  }, [tournament.id, tournament.format]);
+
+  useEffect(() => {
+    setLeagueRoundPage((current) => Math.min(current, leaguePageCount - 1));
+  }, [leaguePageCount]);
+
+  function renderRoundsForStage(stage: Match["stage"], roundsToRender?: number[]) {
+    const rounds = roundsForStage(stage);
+    const visibleRounds = roundsToRender ?? rounds;
+    if (!visibleRounds.length) return null;
+    return (
+      <div className="roundsViewport">
+        <div className="bracket">
+          {visibleRounds.map((round) => (
+            <div key={`${stage}-${round}`} className="roundCol">
+              <h4>
+                {stageLabel(stage)} R{round}
+              </h4>
+              {matches
+                .filter((m) => m.stage === stage && m.round === round)
+                .map((m) => {
+                  const manualResultDisabled = m.round !== latestRound;
+                  const manualResultReason = manualResultDisabled
+                    ? "Manual recording is only allowed for matches in the latest round."
+                    : undefined;
+
+                  return (
+                    <div key={m.id} className="miniCard">
+                      <div className="nameRow">
+                        <span>{participantName(tournament, m.playerA)}</span>
+                        {outcomeFor(m, m.playerA) === "win" && (
+                          <span className="resultMark win">[W]</span>
+                        )}
+                        {outcomeFor(m, m.playerA) === "loss" && (
+                          <span className="resultMark loss">[L]</span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-        ))}
+                      <div className="nameRow">
+                        <span>{participantName(tournament, m.playerB)}</span>
+                        {outcomeFor(m, m.playerB) === "win" && (
+                          <span className="resultMark win">[W]</span>
+                        )}
+                        {outcomeFor(m, m.playerB) === "loss" && (
+                          <span className="resultMark loss">[L]</span>
+                        )}
+                      </div>
+                      {m.groupId && <small>Group {m.groupId}</small>}
+                      {!m.played && <small>Pending</small>}
+                      {m.played && !m.winner && <small>Draw</small>}
+                      {!m.played && (
+                        <button onClick={() => onSimulateMatch(m.id)}>Simulate</button>
+                      )}
+                      {m.playerA !== BYE_ID && m.playerB !== BYE_ID && (
+                        <div className="row">
+                          <button
+                            disabled={manualResultDisabled}
+                            title={manualResultReason}
+                            onClick={() => onSetMatchResult(m.id, m.playerA)}
+                          >
+                            {m.played ? "Set Winner" : "Record"}{" "}
+                            {participantName(tournament, m.playerA)}
+                          </button>
+                          <button
+                            disabled={manualResultDisabled}
+                            title={manualResultReason}
+                            onClick={() => onSetMatchResult(m.id, m.playerB)}
+                          >
+                            {m.played ? "Set Winner" : "Record"}{" "}
+                            {participantName(tournament, m.playerB)}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
+
+  if (!matches.length) return null;
 
   return (
     <section className="panel">
@@ -122,6 +143,37 @@ export function BracketView({
             <h4>Knockout Stage</h4>
             {renderRoundsForStage("KNOCKOUT") ?? <p>Not started yet.</p>}
           </section>
+        </div>
+      ) : format === "LEAGUE" ? (
+        <div className="stack">
+          <div className="row">
+            <button
+              onClick={() => setLeagueRoundPage((current) => Math.max(0, current - 1))}
+              disabled={leagueRoundPage === 0}
+            >
+              Prev Rounds
+            </button>
+            <button
+              onClick={() =>
+                setLeagueRoundPage((current) =>
+                  Math.min(leaguePageCount - 1, current + 1),
+                )
+              }
+              disabled={leagueRoundPage >= leaguePageCount - 1}
+            >
+              Next Rounds
+            </button>
+            <small>
+              Page {leagueRoundPage + 1}/{leaguePageCount}
+            </small>
+          </div>
+          {renderRoundsForStage(
+            "LEAGUE",
+            leagueRounds.slice(
+              leagueRoundPage * leaguePageSize,
+              leagueRoundPage * leaguePageSize + leaguePageSize,
+            ),
+          )}
         </div>
       ) : (
         renderRoundsForStage(format === "SWISS" ? "SWISS" : "KNOCKOUT")

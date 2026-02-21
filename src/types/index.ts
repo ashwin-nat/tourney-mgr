@@ -1,9 +1,9 @@
 export const BYE_ID = "BYE";
 export const SCHEMA_VERSION = 1;
 
-export type TournamentFormat = "GROUP_KO" | "KNOCKOUT" | "SWISS";
+export type TournamentFormat = "GROUP_KO" | "KNOCKOUT" | "SWISS" | "LEAGUE";
 export type TournamentStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
-export type MatchStage = "GROUP" | "KNOCKOUT" | "SWISS";
+export type MatchStage = "GROUP" | "KNOCKOUT" | "SWISS" | "LEAGUE";
 
 export type Participant = {
   id: string;
@@ -60,6 +60,7 @@ export type TournamentSettings = {
   rounds?: number;
   randomSeed?: number;
   allowDraws?: boolean;
+  faceOpponentsTwice?: boolean;
 };
 
 export type Tournament = {

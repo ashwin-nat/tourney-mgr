@@ -1,4 +1,7 @@
+import { useMemo } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 import type { Participant, Standing } from "../types";
+import { SortableTable } from "./SortableTable";
 
 type Props = {
   participants: Participant[];
@@ -8,45 +11,40 @@ type Props = {
 
 export function StandingsTable({ participants, standings, title = "Standings" }: Props) {
   if (!standings) return null;
-  const rows = [...participants].sort((a, b) => {
-    const sa = standings[a.id];
-    const sb = standings[b.id];
-    if (!sa || !sb) return 0;
-    if (sa.points !== sb.points) return sb.points - sa.points;
-    if (sa.wins !== sb.wins) return sb.wins - sa.wins;
-    return b.rating - a.rating;
-  });
+  const rows = participants
+    .map((participant) => ({
+      id: participant.id,
+      name: participant.name,
+      rating: participant.rating,
+      ...(standings[participant.id] ?? {
+        played: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        points: 0,
+      }),
+    }))
+    .sort((a, b) => {
+      if (b.points !== a.points) return b.points - a.points;
+      if (b.wins !== a.wins) return b.wins - a.wins;
+      return b.rating - a.rating;
+    });
+  const columns = useMemo<ColumnDef<(typeof rows)[number]>[]>(
+    () => [
+      { header: "Name", accessorKey: "name" },
+      { header: "P", accessorKey: "played" },
+      { header: "W", accessorKey: "wins" },
+      { header: "D", accessorKey: "draws" },
+      { header: "L", accessorKey: "losses" },
+      { header: "Pts", accessorKey: "points" },
+    ],
+    [],
+  );
 
   return (
     <section className="panel">
       <h3>{title}</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>P</th>
-            <th>W</th>
-            <th>D</th>
-            <th>L</th>
-            <th>Pts</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((p) => {
-            const s = standings[p.id];
-            return (
-              <tr key={p.id}>
-                <td>{p.name}</td>
-                <td>{s.played}</td>
-                <td>{s.wins}</td>
-                <td>{s.draws}</td>
-                <td>{s.losses}</td>
-                <td>{s.points}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <SortableTable data={rows} columns={columns} />
     </section>
   );
 }

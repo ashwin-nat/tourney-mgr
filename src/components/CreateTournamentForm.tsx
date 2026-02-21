@@ -32,6 +32,7 @@ function createDraftParticipant(): DraftParticipant {
 function formatLabel(format: TournamentFormat): string {
   if (format === "GROUP_KO") return "Group + Knockout";
   if (format === "SWISS") return "Swiss";
+  if (format === "LEAGUE") return "League";
   return "Knockout";
 }
 
@@ -60,6 +61,7 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
   const [groupCount, setGroupCount] = useState(2);
   const [advancePerGroup, setAdvancePerGroup] = useState(2);
   const [rounds, setRounds] = useState(5);
+  const [faceOpponentsTwice, setFaceOpponentsTwice] = useState(false);
   const [seed, setSeed] = useState("");
   const participants = useMemo(() => {
     const seen = new Set<string>();
@@ -107,6 +109,7 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
             <option value="KNOCKOUT">Pure Knockout</option>
             <option value="GROUP_KO">Group + Knockout</option>
             <option value="SWISS">Swiss</option>
+            <option value="LEAGUE">League</option>
           </select>
         </label>
         {format === "GROUP_KO" && (
@@ -140,6 +143,16 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
               value={rounds}
               onChange={(e) => setRounds(Number(e.target.value))}
             />
+          </label>
+        )}
+        {(format === "GROUP_KO" || format === "SWISS" || format === "LEAGUE") && (
+          <label className="checkboxRow">
+            <input
+              type="checkbox"
+              checked={faceOpponentsTwice}
+              onChange={(e) => setFaceOpponentsTwice(e.target.checked)}
+            />
+            Face each opponent twice (home/away)
           </label>
         )}
         <label>
@@ -250,6 +263,10 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
                 groupCount: format === "GROUP_KO" ? groupCount : undefined,
                 advancePerGroup: format === "GROUP_KO" ? advancePerGroup : undefined,
                 rounds: format === "SWISS" ? rounds : undefined,
+                faceOpponentsTwice:
+                  format === "GROUP_KO" || format === "SWISS" || format === "LEAGUE"
+                    ? faceOpponentsTwice
+                    : undefined,
                 randomSeed: seed === "" ? undefined : Number(seed),
               },
             });
@@ -258,6 +275,7 @@ export function CreateTournamentForm({ onCreate, historyNames }: Props) {
             setLastAutoName(nextAutoName);
             setDraftParticipants([createDraftParticipant(), createDraftParticipant()]);
             setParticipantsRaw("");
+            setFaceOpponentsTwice(false);
           }}
           disabled={participants.length < 2}
         >

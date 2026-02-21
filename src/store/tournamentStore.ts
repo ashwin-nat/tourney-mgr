@@ -10,6 +10,7 @@ import {
   generateKnockoutRoundOne,
   maybeGenerateNextKnockoutRound,
 } from "../formats/knockout";
+import { generateLeagueMatches } from "../formats/league";
 import { maybeGenerateSwissRound } from "../formats/swiss";
 import { StorageService } from "../storage";
 import {
@@ -351,10 +352,18 @@ export const useTournamentStore = create<Store>((set, get) => ({
         } else if (t.format === "GROUP_KO") {
           const groupCount = Math.max(2, t.settings.groupCount ?? 2);
           groups = createBalancedGroups(t.participants, groupCount, t.settings.randomSeed);
-          matches = generateGroupStageMatches(groups);
-        } else {
+          matches = generateGroupStageMatches(
+            groups,
+            t.settings.faceOpponentsTwice ?? false,
+          );
+        } else if (t.format === "SWISS") {
           const seeded = maybeGenerateSwissRound({ ...t, matches: [] });
           matches = seeded.matches;
+        } else {
+          matches = generateLeagueMatches(
+            t.participants,
+            t.settings.faceOpponentsTwice ?? false,
+          );
         }
         return runFormatProgression({
           ...t,

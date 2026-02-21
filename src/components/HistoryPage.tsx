@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ColumnDef } from "@tanstack/react-table";
 import type { ParticipantHistory, Tournament } from "../types";
 import { getTournamentChampionName } from "../utils/champion";
+import { SortableTable } from "./SortableTable";
 
 type Props = {
   tournaments: Tournament[];
@@ -65,6 +67,107 @@ export function HistoryPage({
       count + tournament.matches.filter((match) => match.played).length,
     0,
   );
+  const participantRows = participants.map((entry) => {
+    const key = entry.name.trim().toLowerCase();
+    const winRate = entry.played ? (entry.wins / entry.played) * 100 : 0;
+    return {
+      key,
+      player: entry.name,
+      played: entry.played,
+      wins: entry.wins,
+      draws: entry.draws,
+      losses: entry.losses,
+      tournaments: entry.tournaments,
+      winRate,
+      opponents: Object.keys(entry.opponents ?? {}).length,
+      selected: key === selectedParticipantKey,
+    };
+  });
+  const participantColumns = useMemo<ColumnDef<(typeof participantRows)[number]>[]>(
+    () => [
+      {
+        header: "Player",
+        accessorKey: "player",
+        cell: (ctx) => {
+          const row = ctx.row.original;
+          return (
+            <button
+              className={row.selected ? "linkButton selectedLinkButton" : "linkButton"}
+              onClick={() =>
+                setSelectedParticipantKey((current) => (current === row.key ? null : row.key))
+              }
+            >
+              {row.player}
+            </button>
+          );
+        },
+      },
+      { header: "P", accessorKey: "played" },
+      { header: "W", accessorKey: "wins" },
+      { header: "D", accessorKey: "draws" },
+      { header: "L", accessorKey: "losses" },
+      { header: "T", accessorKey: "tournaments" },
+      { header: "Win%", accessorKey: "winRate", cell: (ctx) => pct(ctx.getValue<number>()) },
+      { header: "Opponents", accessorKey: "opponents" },
+    ],
+    [setSelectedParticipantKey],
+  );
+  const tournamentRows = tournaments.map((tournament) => ({
+    id: tournament.id,
+    name: tournament.name,
+    format: tournament.format,
+    status: tournament.status,
+    matchesPlayed: tournament.matches.filter((match) => match.played).length,
+    matchesTotal: tournament.matches.length,
+    champion: getTournamentChampionName(tournament) ?? "-",
+  }));
+  const tournamentColumns = useMemo<ColumnDef<(typeof tournamentRows)[number]>[]>(
+    () => [
+      {
+        header: "Name",
+        accessorKey: "name",
+        cell: (ctx) => {
+          const row = ctx.row.original;
+          return (
+            <button className="linkButton" onClick={() => onOpenTournament(row.id)}>
+              {row.name}
+            </button>
+          );
+        },
+      },
+      { header: "Format", accessorKey: "format" },
+      { header: "Status", accessorKey: "status" },
+      {
+        header: "Matches",
+        accessorKey: "matchesPlayed",
+        cell: (ctx) => {
+          const row = ctx.row.original;
+          return `${row.matchesPlayed}/${row.matchesTotal}`;
+        },
+      },
+      { header: "Champion", accessorKey: "champion" },
+    ],
+    [onOpenTournament],
+  );
+  const opponentRows = selectedOpponents.map((opponent) => ({
+    opponent: opponent.opponentName,
+    played: opponent.played,
+    wins: opponent.wins,
+    losses: opponent.losses,
+    draws: opponent.draws,
+    winRate: opponent.played ? (opponent.wins / opponent.played) * 100 : 0,
+  }));
+  const opponentColumns = useMemo<ColumnDef<(typeof opponentRows)[number]>[]>(
+    () => [
+      { header: "Opponent", accessorKey: "opponent" },
+      { header: "P", accessorKey: "played" },
+      { header: "W", accessorKey: "wins" },
+      { header: "L", accessorKey: "losses" },
+      { header: "D", accessorKey: "draws" },
+      { header: "Win%", accessorKey: "winRate", cell: (ctx) => pct(ctx.getValue<number>()) },
+    ],
+    [],
+  );
 
   return (
     <section className="panel">
@@ -108,80 +211,13 @@ export function HistoryPage({
 
       <h3>Player Career Stats</h3>
       {participants.length ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Player</th>
-              <th>P</th>
-              <th>W</th>
-              <th>D</th>
-              <th>L</th>
-              <th>T</th>
-              <th>Win%</th>
-              <th>Opponents</th>
-            </tr>
-          </thead>
-          <tbody>
-            {participants.map((entry) => {
-              const winRate = entry.played ? (entry.wins / entry.played) * 100 : 0;
-              const key = entry.name.trim().toLowerCase();
-              const isSelected = key === selectedParticipantKey;
-              return (
-                <tr key={entry.name.toLowerCase()} className={isSelected ? "selectedRow" : ""}>
-                  <td>
-                    <button
-                      className="linkButton"
-                      onClick={() =>
-                        setSelectedParticipantKey((current) =>
-                          current === key ? null : key,
-                        )
-                      }
-                    >
-                      {entry.name}
-                    </button>
-                  </td>
-                  <td>{entry.played}</td>
-                  <td>{entry.wins}</td>
-                  <td>{entry.draws}</td>
-                  <td>{entry.losses}</td>
-                  <td>{entry.tournaments}</td>
-                  <td>{pct(winRate)}</td>
-                  <td>{Object.keys(entry.opponents ?? {}).length}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <SortableTable data={participantRows} columns={participantColumns} />
       ) : (
         <p>No participant history yet.</p>
       )}
       <h3>Tournament History</h3>
       {tournaments.length ? (
-        <table className="historyTable">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Format</th>
-              <th>Status</th>
-              <th>Matches</th>
-              <th>Champion</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tournaments.map((tournament) => (
-              <tr key={tournament.id} onClick={() => onOpenTournament(tournament.id)}>
-                <td>{tournament.name}</td>
-                <td>{tournament.format}</td>
-                <td>{tournament.status}</td>
-                <td>
-                  {tournament.matches.filter((match) => match.played).length}/
-                  {tournament.matches.length}
-                </td>
-                <td>{getTournamentChampionName(tournament) ?? "-"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <SortableTable data={tournamentRows} columns={tournamentColumns} className="historyTable" />
       ) : (
         <p>No tournaments created yet.</p>
       )}
@@ -227,32 +263,7 @@ export function HistoryPage({
             </div>
             <h4>Head-to-head</h4>
             {selectedOpponents.length ? (
-              <table>
-                <thead>
-                  <tr>
-                    <th>Opponent</th>
-                    <th>P</th>
-                    <th>W</th>
-                    <th>L</th>
-                    <th>D</th>
-                    <th>Win%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedOpponents.map((opponent) => (
-                    <tr
-                      key={`${selectedParticipant.name.toLowerCase()}-${opponent.opponentName.toLowerCase()}`}
-                    >
-                      <td>{opponent.opponentName}</td>
-                      <td>{opponent.played}</td>
-                      <td>{opponent.wins}</td>
-                      <td>{opponent.losses}</td>
-                      <td>{opponent.draws}</td>
-                      <td>{pct(opponent.played ? (opponent.wins / opponent.played) * 100 : 0)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <SortableTable data={opponentRows} columns={opponentColumns} />
             ) : (
               <p>No opponent history yet for this participant.</p>
             )}

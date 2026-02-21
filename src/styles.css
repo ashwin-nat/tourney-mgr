@@ -82,6 +82,16 @@ textarea {
   max-width: 100%;
 }
 
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkboxRow input[type="checkbox"] {
+  width: auto;
+}
+
 button {
   background: #0f5ec7;
   color: white;
@@ -183,9 +193,22 @@ td {
   text-align: left;
 }
 
+.tableSortButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
 .bracket {
   display: flex;
   gap: 8px;
+  width: max-content;
+}
+
+.roundsViewport {
   overflow-x: auto;
 }
 
@@ -240,6 +263,10 @@ td {
   text-decoration: underline;
   cursor: pointer;
   font: inherit;
+}
+
+.selectedLinkButton {
+  font-weight: 700;
 }
 
 .modalOverlay {

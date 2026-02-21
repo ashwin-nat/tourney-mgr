@@ -80,6 +80,13 @@ export function TournamentDetail({
           standings={tournament.standings}
         />
       )}
+      {tournament.format === "LEAGUE" && (
+        <StandingsTable
+          participants={tournament.participants}
+          standings={tournament.standings}
+          title="League Standings"
+        />
+      )}
       {tournament.format === "GROUP_KO" &&
         (tournament.groups ?? []).map((group) => {
           const groupParticipants = tournament.participants.filter((participant) =>

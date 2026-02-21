@@ -10,6 +10,7 @@ function pairKey(a: string, b: string): string {
 export function maybeGenerateSwissRound(tournament: Tournament): Tournament {
   if (tournament.format !== "SWISS") return tournament;
   const maxRounds = tournament.settings.rounds ?? 5;
+  const maxMeetingsPerPair = tournament.settings.faceOpponentsTwice ? 2 : 1;
   const swissMatches = tournament.matches.filter((m) => m.stage === "SWISS");
   const lastRound = Math.max(0, ...swissMatches.map((m) => m.round));
   const hasUnplayed = swissMatches.some((m) => !m.played);
@@ -20,9 +21,10 @@ export function maybeGenerateSwissRound(tournament: Tournament): Tournament {
 
   const standings = buildStandings(tournament.participants, swissMatches);
   const ranked = rankParticipants(tournament.participants, standings);
-  const alreadyPlayed = new Set<string>();
+  const pairingCounts = new Map<string, number>();
   swissMatches.forEach((m) => {
-    alreadyPlayed.add(pairKey(m.playerA, m.playerB));
+    const key = pairKey(m.playerA, m.playerB);
+    pairingCounts.set(key, (pairingCounts.get(key) ?? 0) + 1);
   });
   const hadBye = new Set(
     swissMatches
@@ -43,11 +45,14 @@ export function maybeGenerateSwissRound(tournament: Tournament): Tournament {
 
   while (pool.length > 1) {
     const a = pool.shift()!;
-    let idx = pool.findIndex((b) => !alreadyPlayed.has(pairKey(a.id, b.id)));
+    let idx = pool.findIndex(
+      (b) => (pairingCounts.get(pairKey(a.id, b.id)) ?? 0) < maxMeetingsPerPair,
+    );
     if (idx === -1) idx = 0;
     const [b] = pool.splice(idx, 1);
     pairs.push([a.id, b.id]);
-    alreadyPlayed.add(pairKey(a.id, b.id));
+    const key = pairKey(a.id, b.id);
+    pairingCounts.set(key, (pairingCounts.get(key) ?? 0) + 1);
   }
 
   const newMatches: Match[] = pairs.map(([playerA, playerB]) => ({
