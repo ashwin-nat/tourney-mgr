@@ -1,9 +1,10 @@
-import type { Match, Tournament } from "../types";
+import { BYE_ID, type Match, type Tournament } from "../types";
 import { getTournamentChampionName } from "../utils/champion";
 
 type Props = {
   tournament: Tournament;
   onSimulateMatch: (matchId: string) => void;
+  onSetMatchResult: (matchId: string, winnerId: string) => void;
 };
 
 function participantName(tournament: Tournament, id: string): string {
@@ -23,7 +24,11 @@ function outcomeFor(match: Match, participantId: string): "win" | "loss" | "draw
   return match.winner === participantId ? "win" : "loss";
 }
 
-export function BracketView({ tournament, onSimulateMatch }: Props) {
+export function BracketView({
+  tournament,
+  onSimulateMatch,
+  onSetMatchResult,
+}: Props) {
   const { format, matches } = tournament;
   if (!matches.length) return null;
   const championName = getTournamentChampionName(tournament);
@@ -74,6 +79,16 @@ export function BracketView({ tournament, onSimulateMatch }: Props) {
                     {m.played && !m.winner && <small>Draw</small>}
                     {!m.played && (
                       <button onClick={() => onSimulateMatch(m.id)}>Simulate</button>
+                    )}
+                    {m.playerA !== BYE_ID && m.playerB !== BYE_ID && (
+                      <div className="row">
+                        <button onClick={() => onSetMatchResult(m.id, m.playerA)}>
+                          {m.played ? "Set Winner" : "Record"} {participantName(tournament, m.playerA)}
+                        </button>
+                        <button onClick={() => onSetMatchResult(m.id, m.playerB)}>
+                          {m.played ? "Set Winner" : "Record"} {participantName(tournament, m.playerB)}
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}

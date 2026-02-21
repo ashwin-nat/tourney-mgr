@@ -16,9 +16,11 @@ export default function App() {
     deleteTournament,
     generateFixtures,
     simulateMatch,
+    setMatchResult,
     simulateRound,
     simulateAll,
     resetTournament,
+    clearAll,
     updateParticipantRating,
   } = useTournamentStore();
 
@@ -65,6 +67,9 @@ export default function App() {
                 participantHistory={participantHistory}
                 onGenerateFixtures={() => generateFixtures(current.id)}
                 onSimulateMatch={(matchId) => simulateMatch(current.id, matchId)}
+                onSetMatchResult={(matchId, winnerId) =>
+                  setMatchResult(current.id, matchId, winnerId)
+                }
                 onSimulateRound={(round) => simulateRound(current.id, round)}
                 onSimulateAll={() => simulateAll(current.id)}
                 onReset={() => resetTournament(current.id)}
@@ -84,6 +89,7 @@ export default function App() {
         <HistoryPage
           tournaments={tournaments}
           participantHistory={participantHistory}
+          onClearAll={clearAll}
           onOpenTournament={(id) => {
             selectTournament(id);
             setPage("TOURNAMENTS");

@@ -2,42 +2,36 @@ import { BYE_ID, type Match, type Participant, type Tournament } from "../types"
 import { createTournamentRng } from "../utils/rng";
 
 const DEFAULT_DRAW_CHANCE = 0.05;
+const SIMULATION_ROLLOUTS = 25;
 
 export function winProbability(ratingA: number, ratingB: number): number {
   return 1 / (1 + 10 ** ((ratingB - ratingA) / 20));
 }
 
-function chooseScore(isDraw: boolean, aWon: boolean, rng: () => number) {
-  if (isDraw) {
-    return { scoreA: 1, scoreB: 1 };
-  }
-  const outcomes = aWon
-    ? [
-        [1, 0],
-        [2, 1],
-        [3, 1],
-      ]
-    : [
-        [0, 1],
-        [1, 2],
-        [1, 3],
-      ];
-  const [scoreA, scoreB] = outcomes[Math.floor(rng() * outcomes.length)];
-  return { scoreA, scoreB };
+function simulateWinnerOnce(
+  tournament: Tournament,
+  playerA: Participant,
+  playerB: Participant,
+  rng: () => number,
+): string | undefined {
+  const drawChance = tournament.settings.allowDraws ? DEFAULT_DRAW_CHANCE : 0;
+  if (rng() < drawChance) return undefined;
+  const pA = winProbability(playerA.rating, playerB.rating);
+  return rng() < pA ? playerA.id : playerB.id;
 }
 
 export function simulateMatchResult(
   tournament: Tournament,
   match: Match,
-): Pick<Match, "played" | "winner" | "scoreA" | "scoreB"> {
+): Pick<Match, "played" | "winner"> {
   if (match.playerA === BYE_ID && match.playerB === BYE_ID) {
-    return { played: true, winner: undefined, scoreA: 0, scoreB: 0 };
+    return { played: true, winner: undefined };
   }
   if (match.playerA === BYE_ID) {
-    return { played: true, winner: match.playerB, scoreA: 0, scoreB: 1 };
+    return { played: true, winner: match.playerB };
   }
   if (match.playerB === BYE_ID) {
-    return { played: true, winner: match.playerA, scoreA: 1, scoreB: 0 };
+    return { played: true, winner: match.playerA };
   }
 
   const map = new Map<string, Participant>(
@@ -48,15 +42,28 @@ export function simulateMatchResult(
   if (!a || !b) {
     throw new Error("Cannot simulate match with unknown participants.");
   }
+
   const rng = createTournamentRng(tournament.settings.randomSeed, match.id);
-  const drawChance = tournament.settings.allowDraws ? DEFAULT_DRAW_CHANCE : 0;
-  const drawRoll = rng();
-  if (drawRoll < drawChance) {
-    const drawScore = chooseScore(true, false, rng);
-    return { played: true, winner: undefined, ...drawScore };
+  let aWins = 0;
+  let bWins = 0;
+  let draws = 0;
+
+  for (let i = 0; i < SIMULATION_ROLLOUTS; i += 1) {
+    const winner = simulateWinnerOnce(tournament, a, b, rng);
+    if (winner === a.id) aWins += 1;
+    else if (winner === b.id) bWins += 1;
+    else draws += 1;
   }
-  const pA = winProbability(a.rating, b.rating);
-  const aWon = rng() < pA;
-  const score = chooseScore(false, aWon, rng);
-  return { played: true, winner: aWon ? a.id : b.id, ...score };
+
+  let winner: string | undefined = a.id;
+  let maxWins = aWins;
+  if (bWins > maxWins) {
+    winner = b.id;
+    maxWins = bWins;
+  }
+  if (draws > maxWins) {
+    winner = undefined;
+  }
+
+  return { played: true, winner };
 }

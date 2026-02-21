@@ -32,8 +32,6 @@ export type Match = {
   id: string;
   playerA: string;
   playerB: string;
-  scoreA?: number;
-  scoreB?: number;
   winner?: string;
   played: boolean;
   round: number;

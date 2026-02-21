@@ -7,7 +7,7 @@ type Props = {
   participantHistory: Record<string, ParticipantHistory>;
   onGenerateFixtures: () => void;
   onSimulateMatch: (matchId: string) => void;
-  onSetMatchResult: (matchId: string, scoreA: number, scoreB: number) => void;
+  onSetMatchResult: (matchId: string, winnerId: string) => void;
   onSimulateRound: (round: number) => void;
   onSimulateAll: () => void;
   onReset: () => void;

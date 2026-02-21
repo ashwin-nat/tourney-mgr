@@ -36,7 +36,7 @@ type Store = {
   ) => void;
   generateFixtures: (id: string) => void;
   simulateMatch: (id: string, matchId: string) => void;
-  setMatchResult: (id: string, matchId: string, scoreA: number, scoreB: number) => void;
+  setMatchResult: (id: string, matchId: string, winnerId: string) => void;
   simulateRound: (id: string, round: number) => void;
   simulateAll: (id: string) => void;
   resetTournament: (id: string) => void;
@@ -151,18 +151,14 @@ function applyMatchSimulation(tournament: Tournament, matchIds: string[]): Tourn
 function applyManualMatchResult(
   tournament: Tournament,
   matchId: string,
-  scoreA: number,
-  scoreB: number,
+  winnerId: string,
 ): Tournament {
   const matches = tournament.matches.map((match) => {
     if (match.id !== matchId) return match;
-    let winner: string | undefined;
-    if (scoreA > scoreB) winner = match.playerA;
-    if (scoreB > scoreA) winner = match.playerB;
+    const winner =
+      winnerId === match.playerA || winnerId === match.playerB ? winnerId : undefined;
     return {
       ...match,
-      scoreA,
-      scoreB,
       winner,
       played: true,
     };
@@ -325,10 +321,10 @@ export const useTournamentStore = create<Store>((set, get) => {
       persist(next);
       set({ tournaments, participantHistory });
     },
-    setMatchResult(id, matchId, scoreA, scoreB) {
+    setMatchResult(id, matchId, winnerId) {
       const tournaments = get().tournaments.map((t) => {
         if (t.id !== id) return t;
-        return applyManualMatchResult(t, matchId, scoreA, scoreB);
+        return applyManualMatchResult(t, matchId, winnerId);
       });
       const participantHistory = deriveHistoryFromTournaments(tournaments);
       const next = {
