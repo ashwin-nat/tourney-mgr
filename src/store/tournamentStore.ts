@@ -24,6 +24,11 @@ import {
   type Tournament,
 } from "../types";
 import { makeId } from "../utils/id";
+import {
+  getStageManualEditContext,
+  isGroupRoundEditAllowed,
+  isManualRoundEditAllowed,
+} from "../utils/manualResultRules";
 import { getTournamentChampionId, getTournamentRunnerUpId } from "../utils/champion";
 
 type Store = {
@@ -298,10 +303,33 @@ function applyManualMatchResult(
 ): Tournament {
   const targetMatch = tournament.matches.find((match) => match.id === matchId);
   if (!targetMatch) return tournament;
-  const latestRound = Math.max(...tournament.matches.map((match) => match.round), 0);
-  if (targetMatch.round !== latestRound) return tournament;
+  let shouldRebuildFutureRounds = false;
+  if (targetMatch.stage === "KNOCKOUT" || targetMatch.stage === "SWISS") {
+    const stageMatches = tournament.matches.filter((match) => match.stage === targetMatch.stage);
+    if (!isManualRoundEditAllowed(stageMatches, targetMatch.round)) return tournament;
+    const { allowedRound } = getStageManualEditContext(stageMatches);
+    shouldRebuildFutureRounds = targetMatch.round < allowedRound;
+  }
 
-  const matches = tournament.matches.map((match) => {
+  if (targetMatch.stage === "GROUP") {
+    const groupMatches = tournament.matches.filter((match) => match.stage === "GROUP");
+    const knockoutMatches = tournament.matches.filter((match) => match.stage === "KNOCKOUT");
+    if (!isGroupRoundEditAllowed(groupMatches, knockoutMatches, targetMatch.round)) {
+      return tournament;
+    }
+    shouldRebuildFutureRounds = knockoutMatches.length > 0;
+  }
+
+  const sourceMatches = shouldRebuildFutureRounds
+    ? tournament.matches.filter(
+        (match) =>
+          targetMatch.stage === "GROUP"
+            ? match.stage !== "KNOCKOUT"
+            : !(match.stage === targetMatch.stage && match.round > targetMatch.round),
+      )
+    : tournament.matches;
+
+  const matches = sourceMatches.map((match) => {
     if (match.id !== matchId) return match;
     const winner =
       winnerId === match.playerA || winnerId === match.playerB ? winnerId : undefined;

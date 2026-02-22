@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { BYE_ID, type Match, type Tournament } from "../types";
+import {
+  getStageManualEditContext,
+  isGroupRoundEditAllowed,
+  isManualRoundEditAllowed,
+} from "../utils/manualResultRules";
 import { getTournamentChampionName } from "../utils/champion";
 
 type Props = {
@@ -27,10 +32,10 @@ function outcomeFor(match: Match, participantId: string): "win" | "loss" | "draw
 }
 
 function outcomeIcon(outcome: ReturnType<typeof outcomeFor>): string {
-  if (outcome === "win") return "✅";
-  if (outcome === "loss") return "❌";
-  if (outcome === "draw") return "🤝";
-  return "⏳";
+  if (outcome === "win") return "\u2705";
+  if (outcome === "loss") return "\u274C";
+  if (outcome === "draw") return "\uD83E\uDD1D";
+  return "\u23F3";
 }
 
 export function BracketView({
@@ -41,7 +46,6 @@ export function BracketView({
   const { format, matches } = tournament;
   const [leagueRoundPage, setLeagueRoundPage] = useState(0);
   const championName = getTournamentChampionName(tournament);
-  const latestRound = Math.max(...matches.map((match) => match.round), 0);
   const roundsForStage = (stage: Match["stage"]) =>
     [...new Set(matches.filter((match) => match.stage === stage).map((match) => match.round))].sort(
       (a, b) => a - b,
@@ -63,21 +67,44 @@ export function BracketView({
     const rounds = roundsForStage(stage);
     const visibleRounds = roundsToRender ?? rounds;
     if (!visibleRounds.length) return null;
+
+    const stageMatches = matches.filter((match) => match.stage === stage);
+    const ongoingRound = stageMatches.find((match) => !match.played)?.round;
+    const knockoutMatches = matches.filter((match) => match.stage === "KNOCKOUT");
+    const knockoutExists = knockoutMatches.length > 0;
+    const knockoutStarted = knockoutMatches.some((match) => match.played);
+    const { allowedRound, currentRoundStarted } = getStageManualEditContext(stageMatches);
+
     return (
       <div className="roundsViewport">
         <div className="bracket">
           {visibleRounds.map((round) => (
-            <div key={`${stage}-${round}`} className="roundCol">
+            <div
+              key={`${stage}-${round}`}
+              className={`roundCol ${ongoingRound === round ? "ongoingRoundCol" : ""}`}
+            >
               <h4>
                 {stageLabel(stage)} R{round}
               </h4>
               {matches
                 .filter((m) => m.stage === stage && m.round === round)
                 .map((m) => {
-                  const manualResultDisabled = m.round !== latestRound;
-                  const manualResultReason = manualResultDisabled
-                    ? "Manual recording is only allowed for matches in the latest round."
-                    : undefined;
+                  const manualResultDisabled =
+                    ((m.stage === "KNOCKOUT" || m.stage === "SWISS") && !isManualRoundEditAllowed(stageMatches, m.round)) ||
+                    (m.stage === "GROUP" &&
+                      !isGroupRoundEditAllowed(stageMatches, knockoutMatches, m.round));
+                  const manualResultReason =
+                    m.stage === "GROUP" && manualResultDisabled
+                      ? knockoutStarted
+                        ? "Group-stage results are locked after knockout starts."
+                        : knockoutExists
+                          ? "Only the last group round can be edited before knockout starts."
+                          : "Manual recording is allowed for group-stage matches."
+                      : manualResultDisabled
+                        ? currentRoundStarted
+                          ? "Manual recording is only allowed for the active round in this stage."
+                          : `Manual recording is allowed for round ${allowedRound} and round ${Math.max(1, allowedRound - 1)} until this round starts.`
+                        : undefined;
 
                   return (
                     <div key={m.id} className="miniCard matchCard">
@@ -100,13 +127,17 @@ export function BracketView({
                         </span>
                       </div>
                       <small className="matchMeta">
-                        {m.groupId ? `👥 ${m.groupId}` : ""}
-                        {!m.played ? " ⏳ Pending" : ""}
-                        {m.played && !m.winner ? " 🤝 Draw" : ""}
+                        {m.groupId ? `\uD83D\uDC65 ${m.groupId}` : ""}
+                        {!m.played ? " \u23F3 Pending" : ""}
+                        {m.played && !m.winner ? " \uD83E\uDD1D Draw" : ""}
                       </small>
-                      {!m.played && (
-                        <button onClick={() => onSimulateMatch(m.id)}>🎲 Sim</button>
-                      )}
+                      <button
+                        disabled={m.played}
+                        title={m.played ? "Match already has a result." : undefined}
+                        onClick={() => onSimulateMatch(m.id)}
+                      >
+                        {"\uD83C\uDFB2"} Sim
+                      </button>
                       {m.playerA !== BYE_ID && m.playerB !== BYE_ID && (
                         <div className="row actionRow">
                           <button
@@ -114,14 +145,14 @@ export function BracketView({
                             title={manualResultReason}
                             onClick={() => onSetMatchResult(m.id, m.playerA)}
                           >
-                            🟢 {participantName(tournament, m.playerA)}
+                            {"\uD83D\uDFE2"} {participantName(tournament, m.playerA)}
                           </button>
                           <button
                             disabled={manualResultDisabled}
                             title={manualResultReason}
                             onClick={() => onSetMatchResult(m.id, m.playerB)}
                           >
-                            🟢 {participantName(tournament, m.playerB)}
+                            {"\uD83D\uDFE2"} {participantName(tournament, m.playerB)}
                           </button>
                         </div>
                       )}
