@@ -66,6 +66,7 @@ export function TournamentDetail({
             />
             {participantHistory[p.name.trim().toLowerCase()] && (
               <small>
+                Career Elo: {Math.round(participantHistory[p.name.trim().toLowerCase()].elo)} |{" "}
                 Career W-L-D: {participantHistory[p.name.trim().toLowerCase()].wins}-
                 {participantHistory[p.name.trim().toLowerCase()].losses}-
                 {participantHistory[p.name.trim().toLowerCase()].draws}

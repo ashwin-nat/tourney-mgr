@@ -13,6 +13,9 @@ export type Participant = {
 
 export type ParticipantHistory = {
   name: string;
+  elo: number;
+  peakElo: number;
+  eloMatches: number;
   wins: number;
   losses: number;
   draws: number;

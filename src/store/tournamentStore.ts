@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { buildStandings } from "../engine/standings";
 import { simulateMatchResult } from "../engine/simulation";
+import { applyEloUpdate, ELO_DEFAULT_RATING } from "../engine/elo";
 import {
   createBalancedGroups,
   generateGroupStageMatches,
@@ -111,6 +112,9 @@ function ensureHistoryEntry(
   const existing = history[key];
   if (existing) {
     if (existing.name !== name) existing.name = name;
+    if (typeof existing.elo !== "number") existing.elo = ELO_DEFAULT_RATING;
+    if (typeof existing.peakElo !== "number") existing.peakElo = existing.elo;
+    if (typeof existing.eloMatches !== "number") existing.eloMatches = 0;
     if (!existing.opponents) existing.opponents = {};
     if (typeof existing.tournaments !== "number") existing.tournaments = 0;
     if (typeof existing.completedTournaments !== "number") existing.completedTournaments = 0;
@@ -129,6 +133,9 @@ function ensureHistoryEntry(
   }
   const created: ParticipantHistory = {
     name,
+    elo: ELO_DEFAULT_RATING,
+    peakElo: ELO_DEFAULT_RATING,
+    eloMatches: 0,
     wins: 0,
     losses: 0,
     draws: 0,
@@ -162,7 +169,7 @@ function deriveHistoryFromTournaments(
 ): Record<string, ParticipantHistory> {
   const history: Record<string, ParticipantHistory> = {};
 
-  for (const tournament of tournaments) {
+  for (const tournament of [...tournaments].reverse()) {
     const idToName = new Map(
       tournament.participants.map((participant) => [participant.id, participant.name.trim()]),
     );
@@ -237,6 +244,16 @@ function deriveHistoryFromTournaments(
         bVs.wins += 1;
         aVs.losses += 1;
       }
+
+      const scoreA: 0 | 0.5 | 1 =
+        match.winner === undefined ? 0.5 : match.winner === match.playerA ? 1 : 0;
+      const next = applyEloUpdate(a.elo, b.elo, scoreA, a.eloMatches, b.eloMatches);
+      a.elo = next.ratingA;
+      b.elo = next.ratingB;
+      a.eloMatches += 1;
+      b.eloMatches += 1;
+      a.peakElo = Math.max(a.peakElo, a.elo);
+      b.peakElo = Math.max(b.peakElo, b.elo);
 
       a.opponents[aVsKey] = aVs;
       b.opponents[bVsKey] = bVs;

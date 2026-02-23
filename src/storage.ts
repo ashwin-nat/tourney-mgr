@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import { ELO_DEFAULT_RATING } from "./engine/elo";
 import type { ParticipantHistory, Tournament } from "./types";
 
 const TOURNAMENTS_KEY = "tm_tournaments";
@@ -52,6 +53,9 @@ function normalizeNameKey(name: string): string {
 function emptyHistory(name: string): ParticipantHistory {
   return {
     name,
+    elo: ELO_DEFAULT_RATING,
+    peakElo: ELO_DEFAULT_RATING,
+    eloMatches: 0,
     wins: 0,
     losses: 0,
     draws: 0,
@@ -80,6 +84,20 @@ function normalizeHistory(
     const key = normalizeNameKey(value.name);
     if (!key) continue;
     const existing = normalized[key] ?? emptyHistory(value.name.trim());
+    const existingEloMatches = existing.eloMatches ?? 0;
+    const nextEloMatches = value.eloMatches ?? 0;
+    const mergedEloMatches = existingEloMatches + nextEloMatches;
+    const existingElo =
+      typeof existing.elo === "number" ? existing.elo : ELO_DEFAULT_RATING;
+    const nextElo = typeof value.elo === "number" ? value.elo : ELO_DEFAULT_RATING;
+    const mergedElo =
+      mergedEloMatches > 0
+        ? (existingElo * existingEloMatches + nextElo * nextEloMatches) / mergedEloMatches
+        : nextElo;
+    const mergedPeakElo = Math.max(
+      typeof existing.peakElo === "number" ? existing.peakElo : existingElo,
+      typeof value.peakElo === "number" ? value.peakElo : nextElo,
+    );
     const opponents = { ...existing.opponents };
     for (const opponent of Object.values(value.opponents ?? {})) {
       const opponentKey = normalizeNameKey(opponent.opponentName);
@@ -105,6 +123,9 @@ function normalizeHistory(
     }
     normalized[key] = {
       name: value.name.trim(),
+      elo: Math.round(mergedElo * 100) / 100,
+      peakElo: Math.round(mergedPeakElo * 100) / 100,
+      eloMatches: mergedEloMatches,
       wins: existing.wins + value.wins,
       losses: existing.losses + value.losses,
       draws: existing.draws + value.draws,

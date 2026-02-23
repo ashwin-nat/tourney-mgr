@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import type { NewTournamentInput, Participant, TournamentFormat } from "../types";
+import type {
+  NewTournamentInput,
+  Participant,
+  ParticipantHistory,
+  TournamentFormat,
+} from "../types";
 import { makeId } from "../utils/id";
 
 type Props = {
   onCreate: (input: NewTournamentInput) => void;
-  historyNames: string[];
+  participantHistory: Record<string, ParticipantHistory>;
   previousParticipants: Participant[];
 };
 
@@ -14,14 +19,27 @@ type DraftParticipant = {
   rating: number;
 };
 
-function parseParticipants(raw: string): Participant[] {
+function historicalRating(
+  participantHistory: Record<string, ParticipantHistory>,
+  name: string,
+): number {
+  const entry = participantHistory[name.trim().toLowerCase()];
+  return entry ? Math.round(entry.elo) : 50;
+}
+
+function parseParticipants(
+  raw: string,
+  participantHistory: Record<string, ParticipantHistory>,
+): Participant[] {
   return raw
     .split("\n")
     .map((l) => l.trim())
     .filter(Boolean)
     .map((line) => {
       const [nameRaw, ratingRaw] = line.split(",").map((v) => v.trim());
-      const rating = Number.isFinite(Number(ratingRaw)) ? Number(ratingRaw) : 50;
+      const rating = Number.isFinite(Number(ratingRaw))
+        ? Number(ratingRaw)
+        : historicalRating(participantHistory, nameRaw);
       return { id: makeId("p"), name: nameRaw, rating };
     });
 }
@@ -59,9 +77,16 @@ function formatParticipantsForBulkEdit(participants: Array<Pick<Participant, "na
 
 export function CreateTournamentForm({
   onCreate,
-  historyNames,
+  participantHistory,
   previousParticipants,
 }: Props) {
+  const historyNames = useMemo(
+    () =>
+      Object.values(participantHistory)
+        .map((entry) => entry.name)
+        .sort((a, b) => a.localeCompare(b)),
+    [participantHistory],
+  );
   const previousParticipantsRaw = useMemo(
     () => formatParticipantsForBulkEdit(previousParticipants),
     [previousParticipants],
@@ -196,7 +221,16 @@ export function CreateTournamentForm({
                   setDraftParticipants((current) =>
                     current.map((item) =>
                       item.id === participant.id
-                        ? { ...item, name: e.target.value }
+                        ? (() => {
+                            const nextName = e.target.value;
+                            const historyEntry =
+                              participantHistory[nextName.trim().toLowerCase()];
+                            return {
+                              ...item,
+                              name: nextName,
+                              rating: historyEntry ? Math.round(historyEntry.elo) : item.rating,
+                            };
+                          })()
                         : item,
                     ),
                   )
@@ -257,7 +291,7 @@ export function CreateTournamentForm({
           </label>
           <button
             onClick={() => {
-              const parsed = parseParticipants(participantsRaw);
+              const parsed = parseParticipants(participantsRaw, participantHistory);
               setDraftParticipants(
                 parsed.length
                   ? parsed.map((participant) => ({

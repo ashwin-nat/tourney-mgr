@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { CreateTournamentForm } from "./components/CreateTournamentForm";
 import { HistoryPage } from "./components/HistoryPage";
 import { TournamentDetail } from "./components/TournamentDetail";
@@ -33,13 +33,6 @@ export default function App() {
   }, [hydrate]);
 
   const current = tournaments.find((t) => t.id === currentTournamentId) ?? null;
-  const historyNames = useMemo(
-    () =>
-      Object.values(participantHistory)
-        .map((entry) => entry.name)
-        .sort((a, b) => a.localeCompare(b)),
-    [participantHistory],
-  );
 
   if (!isHydrated) {
     return (
@@ -73,7 +66,7 @@ export default function App() {
           <aside>
             <CreateTournamentForm
               onCreate={createTournament}
-              historyNames={historyNames}
+              participantHistory={participantHistory}
               previousParticipants={tournaments[0]?.participants ?? []}
             />
             <TournamentList

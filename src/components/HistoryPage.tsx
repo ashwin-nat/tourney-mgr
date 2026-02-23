@@ -82,6 +82,7 @@ export function HistoryPage({
     null,
   );
   const participants = Object.values(participantHistory).sort((a, b) => {
+    if (b.elo !== a.elo) return b.elo - a.elo;
     if (b.wins !== a.wins) return b.wins - a.wins;
     if (b.played !== a.played) return b.played - a.played;
     return a.name.localeCompare(b.name);
@@ -242,6 +243,9 @@ export function HistoryPage({
     return {
       key,
       player: entry.name,
+      elo: entry.elo,
+      peakElo: entry.peakElo,
+      eloMatches: entry.eloMatches,
       played: entry.played,
       wins: entry.wins,
       draws: entry.draws,
@@ -281,6 +285,17 @@ export function HistoryPage({
           );
         },
       },
+      {
+        header: "Elo",
+        accessorKey: "elo",
+        cell: (ctx) => Math.round(ctx.getValue<number>()),
+      },
+      {
+        header: "Peak Elo",
+        accessorKey: "peakElo",
+        cell: (ctx) => Math.round(ctx.getValue<number>()),
+      },
+      { header: "Elo M", accessorKey: "eloMatches" },
       { header: "P", accessorKey: "played" },
       { header: "W", accessorKey: "wins" },
       { header: "D", accessorKey: "draws" },
@@ -529,6 +544,18 @@ export function HistoryPage({
               </button>
             </div>
             <div className="historySummary">
+              <article className="miniCard">
+                <strong>{Math.round(selectedParticipant.elo)}</strong>
+                <small>Current Elo</small>
+              </article>
+              <article className="miniCard">
+                <strong>{Math.round(selectedParticipant.peakElo)}</strong>
+                <small>Peak Elo</small>
+              </article>
+              <article className="miniCard">
+                <strong>{selectedParticipant.eloMatches}</strong>
+                <small>Elo Matches</small>
+              </article>
               <article className="miniCard">
                 <strong>{selectedParticipant.played}</strong>
                 <small>Matches played</small>
