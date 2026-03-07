@@ -326,7 +326,14 @@ function applyManualMatchResult(
   if (!targetMatch) return tournament;
   let shouldRebuildFutureRounds = false;
   if (targetMatch.stage === "KNOCKOUT" || targetMatch.stage === "SWISS") {
-    const stageMatches = tournament.matches.filter((match) => match.stage === targetMatch.stage);
+    const stageMatches = tournament.matches.filter((match) => {
+      if (match.stage !== targetMatch.stage) return false;
+      if (targetMatch.stage !== "KNOCKOUT") return true;
+      if (!targetMatch.knockoutBracket) {
+        return match.knockoutBracket === undefined || match.knockoutBracket === "UPPER";
+      }
+      return match.knockoutBracket === targetMatch.knockoutBracket;
+    });
     if (!isManualRoundEditAllowed(stageMatches, targetMatch.round)) return tournament;
     const { allowedRound } = getStageManualEditContext(stageMatches);
     shouldRebuildFutureRounds = targetMatch.round < allowedRound;
@@ -525,7 +532,9 @@ export const useTournamentStore = create<Store>((set, get) => ({
         let matches: Match[] = [];
         let groups = t.groups;
         if (t.format === "KNOCKOUT") {
-          matches = generateKnockoutRoundOne(t.participants, t.settings.randomSeed);
+          matches = generateKnockoutRoundOne(t.participants, t.settings.randomSeed, {
+            doubleElimination: t.settings.doubleElimination ?? false,
+          });
         } else if (t.format === "GROUP_KO") {
           const groupCount = Math.max(2, t.settings.groupCount ?? 2);
           groups = createBalancedGroups(t.participants, groupCount, t.settings.randomSeed);

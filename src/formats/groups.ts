@@ -99,7 +99,10 @@ export function maybeStartKnockoutAfterGroups(tournament: Tournament): Tournamen
   const advancePerGroup = tournament.settings.advancePerGroup ?? 2;
   const groups = tournament.groups ?? [];
   const byId = new Map(tournament.participants.map((p) => [p.id, p]));
-  const qualifiers: Participant[] = [];
+  const qualifiersByPlacement: Participant[][] = Array.from(
+    { length: advancePerGroup },
+    () => [],
+  );
 
   for (const group of groups) {
     const groupParticipants = group.participantIds
@@ -113,13 +116,24 @@ export function maybeStartKnockoutAfterGroups(tournament: Tournament): Tournamen
       rankParticipants(groupParticipants, standing),
       groupMatches.filter((m) => m.groupId === group.id),
     );
-    qualifiers.push(...ranked.slice(0, advancePerGroup));
+    for (let placement = 0; placement < advancePerGroup; placement += 1) {
+      const participant = ranked[placement];
+      if (participant) qualifiersByPlacement[placement].push(participant);
+    }
   }
 
-  const koMatches = generateKnockoutRoundOne(
-    qualifiers,
-    tournament.settings.randomSeed,
-  ).map((m) => ({ ...m, round: (Math.max(...groupMatches.map((gm) => gm.round), 0) || 0) + 1 }));
+  const qualifiers = qualifiersByPlacement.flat();
+  const knockoutStartRound = (Math.max(...groupMatches.map((gm) => gm.round), 0) || 0) + 1;
+  const splitIndex = Math.ceil(qualifiers.length / 2);
+  const upperParticipantIds = qualifiers.slice(0, splitIndex).map((participant) => participant.id);
+  const lowerParticipantIds = qualifiers.slice(splitIndex).map((participant) => participant.id);
+
+  const koMatches = generateKnockoutRoundOne(qualifiers, tournament.settings.randomSeed, {
+    doubleElimination: tournament.settings.doubleElimination ?? false,
+    upperParticipantIds,
+    lowerParticipantIds,
+    startRound: knockoutStartRound,
+  });
 
   return {
     ...tournament,

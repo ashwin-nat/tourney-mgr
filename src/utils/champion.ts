@@ -3,6 +3,11 @@ import { BYE_ID } from "../types";
 import type { Tournament } from "../types";
 
 function championFromKnockout(tournament: Tournament): string | null {
+  const grandFinal = tournament.matches
+    .filter((match) => match.stage === "KNOCKOUT" && match.knockoutBracket === "GRAND_FINAL")
+    .sort((a, b) => b.round - a.round)[0];
+  if (grandFinal?.played && grandFinal.winner) return grandFinal.winner;
+
   const knockoutMatches = tournament.matches.filter(
     (match) => match.stage === "KNOCKOUT" && match.played && match.winner,
   );
@@ -19,6 +24,14 @@ function championFromStandings(tournament: Tournament): string | null {
 }
 
 function runnerUpFromKnockout(tournament: Tournament): string | null {
+  const grandFinal = tournament.matches
+    .filter((match) => match.stage === "KNOCKOUT" && match.knockoutBracket === "GRAND_FINAL")
+    .sort((a, b) => b.round - a.round)[0];
+  if (grandFinal?.played && grandFinal.winner) {
+    const loser = grandFinal.winner === grandFinal.playerA ? grandFinal.playerB : grandFinal.playerA;
+    return loser === BYE_ID ? null : loser;
+  }
+
   const knockoutMatches = tournament.matches.filter(
     (match) => match.stage === "KNOCKOUT" && match.played && match.winner,
   );

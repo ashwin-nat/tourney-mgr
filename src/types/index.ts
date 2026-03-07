@@ -69,6 +69,7 @@ export type Match = {
   round: number;
   stage: MatchStage;
   groupId?: string;
+  knockoutBracket?: "UPPER" | "LOWER" | "GRAND_FINAL";
 };
 
 export type Group = {
@@ -83,6 +84,7 @@ export type TournamentSettings = {
   randomSeed?: number;
   allowDraws?: boolean;
   faceOpponentsTwice?: boolean;
+  doubleElimination?: boolean;
 };
 
 export type Tournament = {

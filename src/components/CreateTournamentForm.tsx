@@ -103,6 +103,7 @@ export function CreateTournamentForm({
   const [advancePerGroup, setAdvancePerGroup] = useState(2);
   const [rounds, setRounds] = useState(5);
   const [faceOpponentsTwice, setFaceOpponentsTwice] = useState(false);
+  const [doubleElimination, setDoubleElimination] = useState(false);
   const [seed, setSeed] = useState("");
   const participants = useMemo(() => {
     const seen = new Set<string>();
@@ -198,6 +199,16 @@ export function CreateTournamentForm({
               onChange={(e) => setFaceOpponentsTwice(e.target.checked)}
             />
             Face each opponent twice (home/away)
+          </label>
+        )}
+        {(format === "KNOCKOUT" || format === "GROUP_KO") && (
+          <label className="checkboxRow">
+            <input
+              type="checkbox"
+              checked={doubleElimination}
+              onChange={(e) => setDoubleElimination(e.target.checked)}
+            />
+            Use upper/lower bracket (double elimination)
           </label>
         )}
         <label>
@@ -336,6 +347,10 @@ export function CreateTournamentForm({
                     ? faceOpponentsTwice
                     : undefined,
                 randomSeed: seed === "" ? undefined : Number(seed),
+                doubleElimination:
+                  format === "KNOCKOUT" || format === "GROUP_KO"
+                    ? doubleElimination
+                    : undefined,
               },
             });
             const nextAutoName = makeDefaultName(format);
@@ -344,6 +359,7 @@ export function CreateTournamentForm({
             setDraftParticipants([createDraftParticipant(), createDraftParticipant()]);
             setParticipantsRaw(previousParticipantsRaw);
             setFaceOpponentsTwice(false);
+            setDoubleElimination(false);
           }}
           disabled={participants.length < 2}
         >

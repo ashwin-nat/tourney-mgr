@@ -153,13 +153,6 @@ button.danger {
   align-items: center;
 }
 
-.nameRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
 .resultMark {
   font-weight: 700;
 }
@@ -212,21 +205,51 @@ td {
 
 .bracket {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   width: max-content;
 }
 
 .roundsViewport {
   overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.bracketCanvas {
+  position: relative;
+  width: max-content;
+}
+
+.bracketLines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bracketLines path {
+  fill: none;
+  stroke: #98b3d7;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .roundCol {
-  min-width: 138px;
+  min-width: 180px;
   display: grid;
-  gap: 6px;
+  gap: 5px;
   border: 1px solid transparent;
   border-radius: 10px;
-  padding: 4px;
+  padding: 5px;
+  align-content: start;
+}
+
+.roundCol > h4 {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #35557d;
 }
 
 .ongoingRoundCol {
@@ -236,30 +259,76 @@ td {
 }
 
 .matchCard {
-  padding: 6px;
-  gap: 4px;
-  font-size: 0.85rem;
+  padding: 5px 6px;
+  gap: 0;
+  font-size: 0.78rem;
+  position: relative;
+  z-index: 1;
 }
 
 .matchCard button {
-  font-size: 0.75rem;
-  padding: 4px 6px;
+  font-size: 0.72rem;
+  padding: 3px 5px;
 }
 
-.matchCard .nameRow {
-  gap: 4px;
-}
-
-.matchMeta {
-  color: #4b647f;
-  min-height: 1rem;
-}
-
-.actionRow {
+.matchMainGrid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 4px;
-  margin-bottom: 0;
+  align-items: stretch;
+}
+
+.namePicks {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 3px;
+}
+
+.namePick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #cddcf0;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #173a66;
+  font-weight: 600;
+}
+
+.namePick span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.namePick.win {
+  border-color: #9fd8b3;
+  background: #e8f7ee;
+}
+
+.namePick.loss {
+  border-color: #efb5be;
+  background: #fdebec;
+}
+
+.namePick.draw {
+  border-color: #d3dce7;
+  background: #eff3f8;
+}
+
+.namePick.pending {
+  border-color: #cddcf0;
+  background: #ffffff;
+}
+
+.simButton {
+  min-width: 58px;
+  padding: 0 6px;
+  align-self: stretch;
 }
 
 .compactPanel {
