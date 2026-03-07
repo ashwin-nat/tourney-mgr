@@ -304,11 +304,15 @@ function runFormatProgression(tournament: Tournament): Tournament {
   return next;
 }
 
-function applyMatchSimulation(tournament: Tournament, matchIds: string[]): Tournament {
+function applyMatchSimulation(
+  tournament: Tournament,
+  matchIds: string[],
+  participantHistory: Record<string, ParticipantHistory>,
+): Tournament {
   const set = new Set(matchIds);
   const matches = tournament.matches.map((match) => {
     if (!set.has(match.id) || match.played) return match;
-    return { ...match, ...simulateMatchResult(tournament, match) };
+    return { ...match, ...simulateMatchResult(tournament, match, participantHistory) };
   });
   return runFormatProgression({ ...tournament, matches, status: "IN_PROGRESS" });
 }
@@ -556,7 +560,7 @@ export const useTournamentStore = create<Store>((set, get) => ({
   simulateMatch(id, matchId) {
     applyAndPersist(get, set, (state) => {
       const tournaments = state.tournaments.map((t) =>
-        t.id === id ? applyMatchSimulation(t, [matchId]) : t,
+        t.id === id ? applyMatchSimulation(t, [matchId], state.participantHistory) : t,
       );
       return {
         tournaments,
@@ -586,7 +590,7 @@ export const useTournamentStore = create<Store>((set, get) => ({
         const matchIds = t.matches
           .filter((m) => !m.played && m.round === round)
           .map((m) => m.id);
-        return applyMatchSimulation(t, matchIds);
+        return applyMatchSimulation(t, matchIds, state.participantHistory);
       });
       return {
         tournaments,
@@ -598,9 +602,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
 
   simulateAll(id) {
     applyAndPersist(get, set, (state) => {
+      const indexById = new Map(state.tournaments.map((tournament, index) => [tournament.id, index]));
       const tournaments = state.tournaments.map((t) => {
         if (t.id !== id) return t;
         let current = t;
+        let history = state.participantHistory;
         for (let guard = 0; guard < 1000; guard += 1) {
           const nextUnplayed = current.matches.find((m) => !m.played);
           if (!nextUnplayed) break;
@@ -608,7 +614,13 @@ export const useTournamentStore = create<Store>((set, get) => ({
           const roundIds = current.matches
             .filter((m) => !m.played && m.round === currentRound)
             .map((m) => m.id);
-          current = applyMatchSimulation(current, roundIds);
+          current = applyMatchSimulation(current, roundIds, history);
+          const tournamentsWithCurrent = [...state.tournaments];
+          const currentIndex = indexById.get(current.id);
+          if (currentIndex !== undefined) {
+            tournamentsWithCurrent[currentIndex] = current;
+            history = deriveHistoryFromTournaments(tournamentsWithCurrent);
+          }
           if (current.status === "COMPLETED") break;
         }
         return current;

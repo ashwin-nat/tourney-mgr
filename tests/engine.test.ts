@@ -10,6 +10,18 @@ describe("simulation", () => {
     expect(winProbability(20, 80)).toBeLessThan(0.5);
   });
 
+  it("factors Elo into win probability", () => {
+    const base = winProbability(50, 50);
+    const withForm = winProbability(50, 50, {
+      eloA: 80,
+      eloB: 20,
+      eloMatchesA: 40,
+      eloMatchesB: 40,
+    });
+    expect(base).toBeCloseTo(0.5, 6);
+    expect(withForm).toBeGreaterThan(base);
+  });
+
   it("is deterministic with seed + match id", () => {
     const tournament: Tournament = {
       id: "t1",
