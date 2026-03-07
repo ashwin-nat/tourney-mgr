@@ -386,6 +386,45 @@ td {
   font-weight: 700;
 }
 
+.recentResults {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.recentBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.recentBadgeWin {
+  background: #e8f7ee;
+  color: #16743a;
+  border-color: #9fd8b3;
+}
+
+.recentBadgeLoss {
+  background: #fdebec;
+  color: #b4233d;
+  border-color: #f0b3bf;
+}
+
+.recentBadgeDraw {
+  background: #eef2f7;
+  color: #5f7086;
+  border-color: #cfd8e3;
+}
+
+.recentEmpty {
+  color: #7b8798;
+}
+
 .modalOverlay {
   position: fixed;
   inset: 0;

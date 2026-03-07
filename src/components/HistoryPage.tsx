@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import type {
   MatchStage,
@@ -38,6 +38,8 @@ type StageBucket = {
   draws: number;
 };
 
+type RecentResult = "W" | "L" | "D";
+
 type FormatStatsRow = {
   format: TournamentFormat;
   tournaments: number;
@@ -66,6 +68,101 @@ function stageLabel(stage: MatchStage): "group" | "knockout" | "swiss" | "league
   if (stage === "KNOCKOUT") return "knockout";
   if (stage === "SWISS") return "swiss";
   return "league";
+}
+
+function matchOutcomeForParticipant(matchWinner: string | undefined, participantId: string): RecentResult {
+  if (matchWinner === undefined) return "D";
+  return matchWinner === participantId ? "W" : "L";
+}
+
+function getRecentResults(
+  tournaments: Tournament[],
+  participantName: string,
+  limit = 5,
+): RecentResult[] {
+  const participantKey = participantName.trim().toLowerCase();
+  const recent: RecentResult[] = [];
+  for (const tournament of tournaments) {
+    const participant = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === participantKey,
+    );
+    if (!participant) continue;
+
+    const matches = tournament.matches
+      .filter(
+        (match) =>
+          match.played &&
+          (match.playerA === participant.id || match.playerB === participant.id),
+      )
+      .sort((a, b) => b.round - a.round);
+
+    for (const match of matches) {
+      recent.push(matchOutcomeForParticipant(match.winner, participant.id));
+      if (recent.length === limit) return recent;
+    }
+  }
+  return recent;
+}
+
+function getRecentResultsVsOpponent(
+  tournaments: Tournament[],
+  participantName: string,
+  opponentName: string,
+  limit = 5,
+): RecentResult[] {
+  const participantKey = participantName.trim().toLowerCase();
+  const opponentKey = opponentName.trim().toLowerCase();
+  const recent: RecentResult[] = [];
+
+  for (const tournament of tournaments) {
+    const participant = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === participantKey,
+    );
+    const opponent = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === opponentKey,
+    );
+    if (!participant || !opponent) continue;
+
+    const matches = tournament.matches
+      .filter(
+        (match) =>
+          match.played &&
+          ((match.playerA === participant.id && match.playerB === opponent.id) ||
+            (match.playerA === opponent.id && match.playerB === participant.id)),
+      )
+      .sort((a, b) => b.round - a.round);
+
+    for (const match of matches) {
+      recent.push(matchOutcomeForParticipant(match.winner, participant.id));
+      if (recent.length === limit) return recent;
+    }
+  }
+
+  return recent;
+}
+
+function renderRecentResults(results: RecentResult[]): ReactNode {
+  if (!results.length) {
+    return <span className="recentEmpty">-</span>;
+  }
+  return (
+    <div className="recentResults" aria-label={`Recent results: ${results.join(" ")}`}>
+      {results.map((result, index) => (
+        <span
+          key={`${result}-${index}`}
+          className={
+            result === "W"
+              ? "recentBadge recentBadgeWin"
+              : result === "L"
+                ? "recentBadge recentBadgeLoss"
+                : "recentBadge recentBadgeDraw"
+          }
+        >
+          {result}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export function HistoryPage({
@@ -243,6 +340,7 @@ export function HistoryPage({
     return {
       key,
       player: entry.name,
+      recent: getRecentResults(tournaments, entry.name),
       elo: entry.elo,
       peakElo: entry.peakElo,
       eloMatches: entry.eloMatches,
@@ -289,6 +387,15 @@ export function HistoryPage({
         header: "Elo",
         accessorKey: "elo",
         cell: (ctx) => Math.round(ctx.getValue<number>()),
+      },
+      {
+        header: "Recent (L5)",
+        accessorKey: "recent",
+        sortingFn: (a, b, id) =>
+          (a.getValue<RecentResult[]>(id) ?? []).join("").localeCompare(
+            (b.getValue<RecentResult[]>(id) ?? []).join(""),
+          ),
+        cell: (ctx) => renderRecentResults(ctx.getValue<RecentResult[]>()),
       },
       {
         header: "Peak Elo",
@@ -368,6 +475,14 @@ export function HistoryPage({
     wins: opponent.wins,
     losses: opponent.losses,
     draws: opponent.draws,
+    recent:
+      selectedParticipant
+        ? getRecentResultsVsOpponent(
+            tournaments,
+            selectedParticipant.name,
+            opponent.opponentName,
+          )
+        : [],
     winRate: opponent.played ? (opponent.wins / opponent.played) * 100 : 0,
   }));
   const opponentColumns = useMemo<ColumnDef<(typeof opponentRows)[number]>[]>(
@@ -377,6 +492,15 @@ export function HistoryPage({
       { header: "W", accessorKey: "wins" },
       { header: "L", accessorKey: "losses" },
       { header: "D", accessorKey: "draws" },
+      {
+        header: "Recent (L5)",
+        accessorKey: "recent",
+        sortingFn: (a, b, id) =>
+          (a.getValue<RecentResult[]>(id) ?? []).join("").localeCompare(
+            (b.getValue<RecentResult[]>(id) ?? []).join(""),
+          ),
+        cell: (ctx) => renderRecentResults(ctx.getValue<RecentResult[]>()),
+      },
       { header: "Win%", accessorKey: "winRate", cell: (ctx) => pct(ctx.getValue<number>()) },
     ],
     [],
