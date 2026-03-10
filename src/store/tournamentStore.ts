@@ -437,6 +437,7 @@ export const useTournamentStore = create<Store>((set, get) => ({
       const tournament: Tournament = {
         id: makeId("t"),
         name: input.name.trim() || "Untitled Tournament",
+        createdAt: new Date().toISOString(),
         format: input.format,
         participants,
         matches: [],

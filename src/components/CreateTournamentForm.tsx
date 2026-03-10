@@ -3,14 +3,17 @@ import type {
   NewTournamentInput,
   Participant,
   ParticipantHistory,
+  Tournament,
   TournamentFormat,
 } from "../types";
+import { getTournamentChampionName } from "../utils/champion";
 import { makeId } from "../utils/id";
 
 type Props = {
   onCreate: (input: NewTournamentInput) => void;
   participantHistory: Record<string, ParticipantHistory>;
   previousParticipants: Participant[];
+  tournaments: Tournament[];
 };
 
 type DraftParticipant = {
@@ -68,6 +71,24 @@ function makeDefaultName(format: TournamentFormat): string {
   return `${formatLabel(format)} ${timestampLabel(new Date())}`;
 }
 
+function toReadableDate(input: string): string {
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return "-";
+  return timestampLabel(date);
+}
+
+function extractDateFromName(name: string): string | null {
+  const match = name.match(/(\d{4}-\d{2}-\d{2} \d{2}:\d{2})$/);
+  return match ? match[1] : null;
+}
+
+function tournamentDateLabel(tournament: Tournament): string {
+  if (tournament.createdAt) {
+    return toReadableDate(tournament.createdAt);
+  }
+  return extractDateFromName(tournament.name) ?? "-";
+}
+
 function formatParticipantsForBulkEdit(participants: Array<Pick<Participant, "name" | "rating">>): string {
   return participants
     .filter((participant) => participant.name.trim())
@@ -79,6 +100,7 @@ export function CreateTournamentForm({
   onCreate,
   participantHistory,
   previousParticipants,
+  tournaments,
 }: Props) {
   const historyNames = useMemo(
     () =>
@@ -105,6 +127,20 @@ export function CreateTournamentForm({
   const [faceOpponentsTwice, setFaceOpponentsTwice] = useState(false);
   const [doubleElimination, setDoubleElimination] = useState(false);
   const [seed, setSeed] = useState("");
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const importRows = useMemo(
+    () =>
+      tournaments.map((tournament) => ({
+        id: tournament.id,
+        date: tournamentDateLabel(tournament),
+        name: tournament.name,
+        participants: tournament.participants,
+        participantCount: tournament.participants.length,
+        format: formatLabel(tournament.format),
+        winner: getTournamentChampionName(tournament) ?? "-",
+      })),
+    [tournaments],
+  );
   const participants = useMemo(() => {
     const seen = new Set<string>();
     return draftParticipants
@@ -125,6 +161,17 @@ export function CreateTournamentForm({
   useEffect(() => {
     setParticipantsRaw(previousParticipantsRaw);
   }, [previousParticipantsRaw]);
+
+  useEffect(() => {
+    if (!isImportModalOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsImportModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isImportModalOpen]);
 
   return (
     <section className="panel">
@@ -221,7 +268,15 @@ export function CreateTournamentForm({
           />
         </label>
         <div className="stack">
-          <strong>Participants</strong>
+          <div className="row modalHeader">
+            <strong>Participants</strong>
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              disabled={!importRows.length}
+            >
+              Import from Previous Tournament
+            </button>
+          </div>
           {draftParticipants.map((participant) => (
             <div className="participantRow" key={participant.id}>
               <input
@@ -366,6 +421,84 @@ export function CreateTournamentForm({
           Create
         </button>
       </div>
+      {isImportModalOpen && (
+        <div
+          className="modalOverlay"
+          onClick={() => setIsImportModalOpen(false)}
+          role="presentation"
+        >
+          <section
+            className="modalCard"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Import participants from a previous tournament"
+          >
+            <div className="row modalHeader">
+              <h3>Import Participants</h3>
+              <button
+                className="danger"
+                onClick={() => setIsImportModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            {importRows.length ? (
+              <div className="tableViewport">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Name</th>
+                      <th># Participants</th>
+                      <th>Format</th>
+                      <th>Winner</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {importRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.date}</td>
+                        <td>{row.name}</td>
+                        <td>{row.participantCount}</td>
+                        <td>{row.format}</td>
+                        <td>{row.winner}</td>
+                        <td>
+                          <button
+                            onClick={() => {
+                              const importedParticipants = row.participants.map(
+                                (participant) => ({
+                                  id: makeId("pd"),
+                                  name: participant.name,
+                                  rating: participant.rating,
+                                }),
+                              );
+                              setDraftParticipants(
+                                importedParticipants.length
+                                  ? importedParticipants
+                                  : [createDraftParticipant(), createDraftParticipant()],
+                              );
+                              setParticipantsRaw(
+                                formatParticipantsForBulkEdit(importedParticipants),
+                              );
+                              setIsImportModalOpen(false);
+                            }}
+                          >
+                            Import
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p>No previous tournaments available.</p>
+            )}
+          </section>
+        </div>
+      )}
     </section>
   );
 }

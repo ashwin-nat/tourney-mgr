@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { buildStandings } from "../engine/standings";
 import type { ParticipantHistory, Tournament } from "../types";
 import { BracketView } from "./BracketView";
@@ -27,8 +28,39 @@ export function TournamentDetail({
   onReset,
   onRatingChange,
 }: Props) {
+  const [isPlayAsModalOpen, setIsPlayAsModalOpen] = useState(false);
+  const [playAsParticipantId, setPlayAsParticipantId] = useState<string | null>(null);
   const nextRound = tournament.matches.find((m) => !m.played)?.round;
   const groupStageMatches = tournament.matches.filter((m) => m.stage === "GROUP");
+  const playAsParticipant = useMemo(
+    () =>
+      playAsParticipantId
+        ? tournament.participants.find((participant) => participant.id === playAsParticipantId) ??
+          null
+        : null,
+    [playAsParticipantId, tournament.participants],
+  );
+  const participantsAlphabetical = useMemo(
+    () =>
+      [...tournament.participants].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      ),
+    [tournament.participants],
+  );
+
+  useEffect(() => {
+    setPlayAsParticipantId(null);
+    setIsPlayAsModalOpen(false);
+  }, [tournament.id]);
+
+  useEffect(() => {
+    if (!isPlayAsModalOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsPlayAsModalOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isPlayAsModalOpen]);
 
   return (
     <section className="panel">
@@ -50,7 +82,20 @@ export function TournamentDetail({
         <button className="danger" onClick={onReset}>
           Reset
         </button>
+        <button onClick={() => setIsPlayAsModalOpen(true)}>Play As</button>
+        <button
+          className="danger"
+          disabled={!playAsParticipantId}
+          onClick={() => setPlayAsParticipantId(null)}
+        >
+          Clear Play As
+        </button>
       </div>
+      {playAsParticipant && (
+        <p>
+          Playing as: <strong>{playAsParticipant.name}</strong>
+        </p>
+      )}
 
       <h3>Participants</h3>
       <div className="grid">
@@ -125,7 +170,64 @@ export function TournamentDetail({
         tournament={tournament}
         onSimulateMatch={onSimulateMatch}
         onSetMatchResult={onSetMatchResult}
+        playAsParticipantId={playAsParticipantId}
       />
+      {isPlayAsModalOpen && (
+        <div
+          className="modalOverlay"
+          onClick={() => setIsPlayAsModalOpen(false)}
+          role="presentation"
+        >
+          <section
+            className="modalCard"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Select play-as participant"
+          >
+            <div className="row modalHeader">
+              <h3>Play As</h3>
+              <button
+                className="danger"
+                onClick={() => setIsPlayAsModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+            <div className="tableViewport">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Participant</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {participantsAlphabetical.map((participant) => {
+                    const selected = participant.id === playAsParticipantId;
+                    return (
+                      <tr key={participant.id} className={selected ? "selectedRow" : ""}>
+                        <td>{participant.name}</td>
+                        <td>
+                          <button
+                            className={selected ? "danger" : undefined}
+                            onClick={() => {
+                              setPlayAsParticipantId(selected ? null : participant.id);
+                              setIsPlayAsModalOpen(false);
+                            }}
+                          >
+                            {selected ? "Clear" : "Select"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

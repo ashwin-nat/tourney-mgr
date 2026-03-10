@@ -266,6 +266,12 @@ td {
   z-index: 1;
 }
 
+.matchCard.trackedMatch {
+  border-color: #f3c12f;
+  background: linear-gradient(135deg, #fff9e6, #fff4ce);
+  box-shadow: 0 0 0 1px #f3c12f66;
+}
+
 .matchCard button {
   font-size: 0.72rem;
   padding: 3px 5px;
@@ -323,6 +329,11 @@ td {
 .namePick.pending {
   border-color: #cddcf0;
   background: #ffffff;
+}
+
+.namePick.trackedParticipant {
+  border-color: #d89f05;
+  box-shadow: inset 0 0 0 1px #f3c12f;
 }
 
 .simButton {

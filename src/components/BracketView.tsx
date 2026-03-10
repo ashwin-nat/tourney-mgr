@@ -11,6 +11,7 @@ type Props = {
   tournament: Tournament;
   onSimulateMatch: (matchId: string) => void;
   onSetMatchResult: (matchId: string, winnerId: string) => void;
+  playAsParticipantId?: string | null;
 };
 
 type BracketLine = {
@@ -53,6 +54,7 @@ export function BracketView({
   tournament,
   onSimulateMatch,
   onSetMatchResult,
+  playAsParticipantId = null,
 }: Props) {
   const { format, matches } = tournament;
   const [leagueRoundPage, setLeagueRoundPage] = useState(0);
@@ -247,6 +249,9 @@ export function BracketView({
                   return m.knockoutBracket === knockoutBracket;
                 })
                 .map((m) => {
+                  const highlightMatch =
+                    !!playAsParticipantId &&
+                    (m.playerA === playAsParticipantId || m.playerB === playAsParticipantId);
                   const manualResultDisabled =
                     ((m.stage === "KNOCKOUT" || m.stage === "SWISS") && !isManualRoundEditAllowed(stageMatches, m.round)) ||
                     (m.stage === "GROUP" &&
@@ -265,11 +270,18 @@ export function BracketView({
                         : undefined;
 
                   return (
-                    <div key={m.id} className="miniCard matchCard" data-match-id={m.id} data-round={m.round}>
+                    <div
+                      key={m.id}
+                      className={`miniCard matchCard ${highlightMatch ? "trackedMatch" : ""}`}
+                      data-match-id={m.id}
+                      data-round={m.round}
+                    >
                       <div className="matchMainGrid">
                         <div className="namePicks">
                           <button
-                            className={`namePick ${outcomeFor(m, m.playerA)}`}
+                            className={`namePick ${outcomeFor(m, m.playerA)} ${
+                              m.playerA === playAsParticipantId ? "trackedParticipant" : ""
+                            }`}
                             disabled={
                               m.playerA === BYE_ID || m.playerB === BYE_ID || manualResultDisabled
                             }
@@ -285,7 +297,9 @@ export function BracketView({
                             </span>
                           </button>
                           <button
-                            className={`namePick ${outcomeFor(m, m.playerB)}`}
+                            className={`namePick ${outcomeFor(m, m.playerB)} ${
+                              m.playerB === playAsParticipantId ? "trackedParticipant" : ""
+                            }`}
                             disabled={
                               m.playerA === BYE_ID || m.playerB === BYE_ID || manualResultDisabled
                             }

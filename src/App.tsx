@@ -68,6 +68,7 @@ export default function App() {
               onCreate={createTournament}
               participantHistory={participantHistory}
               previousParticipants={tournaments[0]?.participants ?? []}
+              tournaments={tournaments}
             />
             <TournamentList
               tournaments={tournaments}

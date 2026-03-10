@@ -90,6 +90,7 @@ export type TournamentSettings = {
 export type Tournament = {
   id: string;
   name: string;
+  createdAt?: string;
   format: TournamentFormat;
   participants: Participant[];
   matches: Match[];
