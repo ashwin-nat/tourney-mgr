@@ -481,6 +481,7 @@ td {
   font-size: 0.72rem;
   font-weight: 700;
   border: 1px solid transparent;
+  cursor: help;
 }
 
 .recentBadgeWin {

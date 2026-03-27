@@ -24,4 +24,27 @@ describe("elo", () => {
     expect(draw.ratingA).toBeCloseTo(ELO_DEFAULT_RATING, 6);
     expect(draw.ratingB).toBeCloseTo(ELO_DEFAULT_RATING, 6);
   });
+
+  it("does not let a newcomer overtake a veteran after only two wins", () => {
+    let newcomerRating = ELO_DEFAULT_RATING;
+    let veteranRating = 82;
+    let newcomerMatches = 0;
+    let veteranMatches = 120;
+
+    for (let i = 0; i < 2; i += 1) {
+      const next = applyEloUpdate(
+        newcomerRating,
+        veteranRating,
+        1,
+        newcomerMatches,
+        veteranMatches,
+      );
+      newcomerRating = next.ratingA;
+      veteranRating = next.ratingB;
+      newcomerMatches += 1;
+      veteranMatches += 1;
+    }
+
+    expect(newcomerRating).toBeLessThan(veteranRating);
+  });
 });

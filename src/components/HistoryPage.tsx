@@ -38,7 +38,14 @@ type StageBucket = {
   draws: number;
 };
 
-type RecentResult = "W" | "L" | "D";
+type RecentOutcome = "W" | "L" | "D";
+
+type RecentResult = {
+  outcome: RecentOutcome;
+  opponentName: string;
+  tournamentName: string;
+  round: number;
+};
 
 type FormatStatsRow = {
   format: TournamentFormat;
@@ -70,9 +77,30 @@ function stageLabel(stage: MatchStage): "group" | "knockout" | "swiss" | "league
   return "league";
 }
 
-function matchOutcomeForParticipant(matchWinner: string | undefined, participantId: string): RecentResult {
+function matchOutcomeForParticipant(
+  matchWinner: string | undefined,
+  participantId: string,
+): RecentOutcome {
   if (matchWinner === undefined) return "D";
   return matchWinner === participantId ? "W" : "L";
+}
+
+function tournamentsByRecency(tournaments: Tournament[]): Tournament[] {
+  return tournaments
+    .map((tournament, index) => {
+      const createdAtMs = tournament.createdAt ? Date.parse(tournament.createdAt) : NaN;
+      return { tournament, index, createdAtMs };
+    })
+    .sort((a, b) => {
+      const aHasTimestamp = Number.isFinite(a.createdAtMs);
+      const bHasTimestamp = Number.isFinite(b.createdAtMs);
+      if (aHasTimestamp && bHasTimestamp && a.createdAtMs !== b.createdAtMs) {
+        return b.createdAtMs - a.createdAtMs;
+      }
+      if (aHasTimestamp !== bHasTimestamp) return aHasTimestamp ? -1 : 1;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.tournament);
 }
 
 function getRecentResults(
@@ -82,7 +110,7 @@ function getRecentResults(
 ): RecentResult[] {
   const participantKey = participantName.trim().toLowerCase();
   const recent: RecentResult[] = [];
-  for (const tournament of tournaments) {
+  for (const tournament of tournamentsByRecency(tournaments)) {
     const participant = tournament.participants.find(
       (entry) => entry.name.trim().toLowerCase() === participantKey,
     );
@@ -97,11 +125,19 @@ function getRecentResults(
       .sort((a, b) => b.round - a.round);
 
     for (const match of matches) {
-      recent.push(matchOutcomeForParticipant(match.winner, participant.id));
-      if (recent.length === limit) return recent;
+      const opponentId = match.playerA === participant.id ? match.playerB : match.playerA;
+      const opponentName =
+        tournament.participants.find((entry) => entry.id === opponentId)?.name ?? "Unknown";
+      recent.push({
+        outcome: matchOutcomeForParticipant(match.winner, participant.id),
+        opponentName,
+        tournamentName: tournament.name,
+        round: match.round,
+      });
+      if (recent.length === limit) return recent.reverse();
     }
   }
-  return recent;
+  return recent.reverse();
 }
 
 function getRecentResultsVsOpponent(
@@ -114,7 +150,7 @@ function getRecentResultsVsOpponent(
   const opponentKey = opponentName.trim().toLowerCase();
   const recent: RecentResult[] = [];
 
-  for (const tournament of tournaments) {
+  for (const tournament of tournamentsByRecency(tournaments)) {
     const participant = tournament.participants.find(
       (entry) => entry.name.trim().toLowerCase() === participantKey,
     );
@@ -133,12 +169,17 @@ function getRecentResultsVsOpponent(
       .sort((a, b) => b.round - a.round);
 
     for (const match of matches) {
-      recent.push(matchOutcomeForParticipant(match.winner, participant.id));
-      if (recent.length === limit) return recent;
+      recent.push({
+        outcome: matchOutcomeForParticipant(match.winner, participant.id),
+        opponentName: opponent.name,
+        tournamentName: tournament.name,
+        round: match.round,
+      });
+      if (recent.length === limit) return recent.reverse();
     }
   }
 
-  return recent;
+  return recent.reverse();
 }
 
 function renderRecentResults(results: RecentResult[]): ReactNode {
@@ -146,19 +187,25 @@ function renderRecentResults(results: RecentResult[]): ReactNode {
     return <span className="recentEmpty">-</span>;
   }
   return (
-    <div className="recentResults" aria-label={`Recent results: ${results.join(" ")}`}>
+    <div
+      className="recentResults"
+      aria-label={`Recent results: ${results
+        .map((result) => `${result.outcome} vs ${result.opponentName}`)
+        .join(", ")}`}
+    >
       {results.map((result, index) => (
         <span
-          key={`${result}-${index}`}
+          key={`${result.outcome}-${result.opponentName}-${index}`}
           className={
-            result === "W"
+            result.outcome === "W"
               ? "recentBadge recentBadgeWin"
-              : result === "L"
+              : result.outcome === "L"
                 ? "recentBadge recentBadgeLoss"
                 : "recentBadge recentBadgeDraw"
           }
+          title={`vs ${result.opponentName} (${result.tournamentName}, R${result.round})`}
         >
-          {result}
+          {result.outcome}
         </span>
       ))}
     </div>
@@ -392,8 +439,13 @@ export function HistoryPage({
         header: "Recent (L5)",
         accessorKey: "recent",
         sortingFn: (a, b, id) =>
-          (a.getValue<RecentResult[]>(id) ?? []).join("").localeCompare(
-            (b.getValue<RecentResult[]>(id) ?? []).join(""),
+          (a.getValue<RecentResult[]>(id) ?? [])
+            .map((result) => result.outcome)
+            .join("")
+            .localeCompare(
+              (b.getValue<RecentResult[]>(id) ?? [])
+                .map((result) => result.outcome)
+                .join(""),
           ),
         cell: (ctx) => renderRecentResults(ctx.getValue<RecentResult[]>()),
       },
@@ -496,8 +548,13 @@ export function HistoryPage({
         header: "Recent (L5)",
         accessorKey: "recent",
         sortingFn: (a, b, id) =>
-          (a.getValue<RecentResult[]>(id) ?? []).join("").localeCompare(
-            (b.getValue<RecentResult[]>(id) ?? []).join(""),
+          (a.getValue<RecentResult[]>(id) ?? [])
+            .map((result) => result.outcome)
+            .join("")
+            .localeCompare(
+              (b.getValue<RecentResult[]>(id) ?? [])
+                .map((result) => result.outcome)
+                .join(""),
           ),
         cell: (ctx) => renderRecentResults(ctx.getValue<RecentResult[]>()),
       },

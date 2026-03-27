@@ -1,8 +1,8 @@
 export const ELO_DEFAULT_RATING = 50;
-const ELO_SCALE = 20;
-const ELO_K_BASE = 24;
-const ELO_K_PROVISIONAL = 32;
-const ELO_PROVISIONAL_MATCHES = 20;
+const ELO_SCALE = 35;
+const ELO_K_BASE = 8;
+const ELO_K_NEWCOMER = 6;
+const ELO_NEWCOMER_MATCHES = 12;
 const ELO_MIN = 0;
 const ELO_MAX = 100;
 
@@ -16,7 +16,9 @@ function clampRating(value: number): number {
 }
 
 function kFactor(matchesPlayed: number): number {
-  return matchesPlayed < ELO_PROVISIONAL_MATCHES ? ELO_K_PROVISIONAL : ELO_K_BASE;
+  const boundedMatches = Math.max(0, Math.min(matchesPlayed, ELO_NEWCOMER_MATCHES));
+  const progress = boundedMatches / ELO_NEWCOMER_MATCHES;
+  return ELO_K_NEWCOMER + (ELO_K_BASE - ELO_K_NEWCOMER) * progress;
 }
 
 function expectedScore(ratingA: number, ratingB: number): number {
