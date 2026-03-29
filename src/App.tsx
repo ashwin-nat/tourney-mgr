@@ -7,6 +7,9 @@ import { useTournamentStore } from "./store/tournamentStore";
 
 export default function App() {
   const [page, setPage] = useState<"TOURNAMENTS" | "HISTORY">("TOURNAMENTS");
+  const [playAsByTournamentId, setPlayAsByTournamentId] = useState<
+    Record<string, string | null>
+  >({});
   const {
     tournaments,
     participantHistory,
@@ -32,7 +35,26 @@ export default function App() {
     void hydrate();
   }, [hydrate]);
 
+  useEffect(() => {
+    setPlayAsByTournamentId((currentSelections) => {
+      const tournamentIds = new Set(tournaments.map((t) => t.id));
+      let didChange = false;
+      const nextSelections: Record<string, string | null> = {};
+
+      for (const [tournamentId, participantId] of Object.entries(currentSelections)) {
+        if (tournamentIds.has(tournamentId)) {
+          nextSelections[tournamentId] = participantId;
+        } else {
+          didChange = true;
+        }
+      }
+
+      return didChange ? nextSelections : currentSelections;
+    });
+  }, [tournaments]);
+
   const current = tournaments.find((t) => t.id === currentTournamentId) ?? null;
+  const currentPlayAsParticipantId = current ? (playAsByTournamentId[current.id] ?? null) : null;
 
   if (!isHydrated) {
     return (
@@ -74,7 +96,15 @@ export default function App() {
               tournaments={tournaments}
               currentId={currentTournamentId}
               onSelect={selectTournament}
-              onDelete={deleteTournament}
+              onDelete={(id) => {
+                deleteTournament(id);
+                setPlayAsByTournamentId((currentSelections) => {
+                  if (!(id in currentSelections)) return currentSelections;
+                  const nextSelections = { ...currentSelections };
+                  delete nextSelections[id];
+                  return nextSelections;
+                });
+              }}
             />
           </aside>
           <section>
@@ -82,6 +112,7 @@ export default function App() {
               <TournamentDetail
                 tournament={current}
                 participantHistory={participantHistory}
+                playAsParticipantId={currentPlayAsParticipantId}
                 onGenerateFixtures={() => generateFixtures(current.id)}
                 onSimulateMatch={(matchId) => simulateMatch(current.id, matchId)}
                 onSetMatchResult={(matchId, winnerId) =>
@@ -93,6 +124,14 @@ export default function App() {
                 onRatingChange={(participantId, rating) =>
                   updateParticipantRating(current.id, participantId, rating)
                 }
+                onPlayAsParticipantChange={(participantId) => {
+                  setPlayAsByTournamentId((currentSelections) => {
+                    if (currentSelections[current.id] === participantId) {
+                      return currentSelections;
+                    }
+                    return { ...currentSelections, [current.id]: participantId };
+                  });
+                }}
               />
             ) : (
               <section className="panel">
@@ -108,7 +147,10 @@ export default function App() {
           participantHistory={participantHistory}
           onExportStats={exportStats}
           onImportStats={importStats}
-          onClearAll={clearAll}
+          onClearAll={() => {
+            clearAll();
+            setPlayAsByTournamentId({});
+          }}
           onOpenTournament={(id) => {
             selectTournament(id);
             setPage("TOURNAMENTS");

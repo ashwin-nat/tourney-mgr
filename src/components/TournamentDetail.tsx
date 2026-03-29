@@ -8,6 +8,7 @@ import { StandingsTable } from "./StandingsTable";
 type Props = {
   tournament: Tournament;
   participantHistory: Record<string, ParticipantHistory>;
+  playAsParticipantId: string | null;
   onGenerateFixtures: () => void;
   onSimulateMatch: (matchId: string) => void;
   onSetMatchResult: (matchId: string, winnerId: string) => void;
@@ -15,11 +16,13 @@ type Props = {
   onSimulateAll: () => void;
   onReset: () => void;
   onRatingChange: (participantId: string, rating: number) => void;
+  onPlayAsParticipantChange: (participantId: string | null) => void;
 };
 
 export function TournamentDetail({
   tournament,
   participantHistory,
+  playAsParticipantId,
   onGenerateFixtures,
   onSimulateMatch,
   onSetMatchResult,
@@ -27,9 +30,9 @@ export function TournamentDetail({
   onSimulateAll,
   onReset,
   onRatingChange,
+  onPlayAsParticipantChange,
 }: Props) {
   const [isPlayAsModalOpen, setIsPlayAsModalOpen] = useState(false);
-  const [playAsParticipantId, setPlayAsParticipantId] = useState<string | null>(null);
   const nextRound = tournament.matches.find((m) => !m.played)?.round;
   const groupStageMatches = tournament.matches.filter((m) => m.stage === "GROUP");
   const playAsParticipant = useMemo(
@@ -49,9 +52,16 @@ export function TournamentDetail({
   );
 
   useEffect(() => {
-    setPlayAsParticipantId(null);
     setIsPlayAsModalOpen(false);
   }, [tournament.id]);
+
+  useEffect(() => {
+    if (!playAsParticipantId) return;
+    const selectedExists = tournament.participants.some(
+      (participant) => participant.id === playAsParticipantId,
+    );
+    if (!selectedExists) onPlayAsParticipantChange(null);
+  }, [onPlayAsParticipantChange, playAsParticipantId, tournament.participants]);
 
   useEffect(() => {
     if (!isPlayAsModalOpen) return;
@@ -86,7 +96,7 @@ export function TournamentDetail({
         <button
           className="danger"
           disabled={!playAsParticipantId}
-          onClick={() => setPlayAsParticipantId(null)}
+          onClick={() => onPlayAsParticipantChange(null)}
         >
           Clear Play As
         </button>
@@ -212,7 +222,7 @@ export function TournamentDetail({
                           <button
                             className={selected ? "danger" : undefined}
                             onClick={() => {
-                              setPlayAsParticipantId(selected ? null : participant.id);
+                              onPlayAsParticipantChange(selected ? null : participant.id);
                               setIsPlayAsModalOpen(false);
                             }}
                           >
