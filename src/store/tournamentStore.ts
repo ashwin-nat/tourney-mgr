@@ -326,14 +326,9 @@ function applyManualMatchResult(
   if (!targetMatch) return tournament;
   let shouldRebuildFutureRounds = false;
   if (targetMatch.stage === "KNOCKOUT" || targetMatch.stage === "SWISS") {
-    const stageMatches = tournament.matches.filter((match) => {
-      if (match.stage !== targetMatch.stage) return false;
-      if (targetMatch.stage !== "KNOCKOUT") return true;
-      if (!targetMatch.knockoutBracket) {
-        return match.knockoutBracket === undefined || match.knockoutBracket === "UPPER";
-      }
-      return match.knockoutBracket === targetMatch.knockoutBracket;
-    });
+    const stageMatches = tournament.matches.filter(
+      (match) => match.stage === targetMatch.stage,
+    );
     if (!isManualRoundEditAllowed(stageMatches, targetMatch.round)) return tournament;
     const { allowedRound } = getStageManualEditContext(stageMatches);
     shouldRebuildFutureRounds = targetMatch.round < allowedRound;
