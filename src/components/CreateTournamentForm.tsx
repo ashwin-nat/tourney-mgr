@@ -96,6 +96,17 @@ function formatParticipantsForBulkEdit(participants: Array<Pick<Participant, "na
     .join("\n");
 }
 
+function toDraftParticipants(
+  participants: Array<Pick<Participant, "name" | "rating">>,
+): DraftParticipant[] {
+  const next = participants.map((participant) => ({
+    id: makeId("pd"),
+    name: participant.name,
+    rating: participant.rating,
+  }));
+  return next.length ? next : [createDraftParticipant(), createDraftParticipant()];
+}
+
 export function CreateTournamentForm({
   onCreate,
   participantHistory,
@@ -132,6 +143,8 @@ export function CreateTournamentForm({
     () =>
       tournaments.map((tournament) => ({
         id: tournament.id,
+        formatValue: tournament.format,
+        settings: tournament.settings,
         date: tournamentDateLabel(tournament),
         name: tournament.name,
         participants: tournament.participants,
@@ -157,6 +170,23 @@ export function CreateTournamentForm({
         return true;
       });
   }, [draftParticipants]);
+
+  const copyTournamentTemplate = (
+    source: Pick<Tournament, "participants" | "format" | "settings">,
+  ) => {
+    const importedParticipants = toDraftParticipants(source.participants);
+    setDraftParticipants(importedParticipants);
+    setParticipantsRaw(formatParticipantsForBulkEdit(importedParticipants));
+    setFormat(source.format);
+    setGroupCount(Math.max(2, source.settings.groupCount ?? 2));
+    setAdvancePerGroup(Math.max(1, source.settings.advancePerGroup ?? 2));
+    setRounds(Math.max(1, source.settings.rounds ?? 5));
+    setFaceOpponentsTwice(source.settings.faceOpponentsTwice ?? false);
+    setDoubleElimination(source.settings.doubleElimination ?? false);
+    setSeed(
+      source.settings.randomSeed === undefined ? "" : String(source.settings.randomSeed),
+    );
+  };
 
   useEffect(() => {
     setParticipantsRaw(previousParticipantsRaw);
@@ -274,7 +304,7 @@ export function CreateTournamentForm({
               onClick={() => setIsImportModalOpen(true)}
               disabled={!importRows.length}
             >
-              Import from Previous Tournament
+              Copy from Previous Tournament
             </button>
           </div>
           {draftParticipants.map((participant) => (
@@ -432,10 +462,10 @@ export function CreateTournamentForm({
             onClick={(event) => event.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="Import participants from a previous tournament"
+            aria-label="Copy participants and rules from a previous tournament"
           >
             <div className="row modalHeader">
-              <h3>Import Participants</h3>
+              <h3>Copy from Previous Tournament</h3>
               <button
                 className="danger"
                 onClick={() => setIsImportModalOpen(false)}
@@ -467,25 +497,15 @@ export function CreateTournamentForm({
                         <td>
                           <button
                             onClick={() => {
-                              const importedParticipants = row.participants.map(
-                                (participant) => ({
-                                  id: makeId("pd"),
-                                  name: participant.name,
-                                  rating: participant.rating,
-                                }),
-                              );
-                              setDraftParticipants(
-                                importedParticipants.length
-                                  ? importedParticipants
-                                  : [createDraftParticipant(), createDraftParticipant()],
-                              );
-                              setParticipantsRaw(
-                                formatParticipantsForBulkEdit(importedParticipants),
-                              );
+                              copyTournamentTemplate({
+                                participants: row.participants,
+                                format: row.formatValue,
+                                settings: row.settings,
+                              });
                               setIsImportModalOpen(false);
                             }}
                           >
-                            Import
+                            Copy
                           </button>
                         </td>
                       </tr>
