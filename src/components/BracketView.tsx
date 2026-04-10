@@ -10,6 +10,7 @@ import { getTournamentChampionName } from "../utils/champion";
 type Props = {
   tournament: Tournament;
   onSimulateMatch: (matchId: string) => void;
+  onSimulateRound: (round: number) => void;
   onSetMatchResult: (matchId: string, winnerId: string) => void;
   playAsParticipantId?: string | null;
 };
@@ -53,6 +54,7 @@ function outcomeIcon(outcome: ReturnType<typeof outcomeFor>): string {
 export function BracketView({
   tournament,
   onSimulateMatch,
+  onSimulateRound,
   onSetMatchResult,
   playAsParticipantId = null,
 }: Props) {
@@ -238,6 +240,31 @@ export function BracketView({
               key={`${stage}-${round}`}
               className={`roundCol ${ongoingRound === round ? "ongoingRoundCol" : ""}`}
             >
+              {(() => {
+                const isActiveRound = ongoingRound === round;
+                if (!isActiveRound) return null;
+                const roundMatches = stageMatches.filter((match) => match.round === round);
+
+                const isGrandFinal =
+                  stage === "KNOCKOUT" && knockoutBracket === "GRAND_FINAL";
+                const isUpperOrLowerFinal =
+                  stage === "KNOCKOUT" &&
+                  (knockoutBracket === "UPPER" || knockoutBracket === "LOWER") &&
+                  roundMatches.length === 1 &&
+                  roundMatches[0].playerA !== BYE_ID &&
+                  roundMatches[0].playerB !== BYE_ID;
+
+                if (isGrandFinal || isUpperOrLowerFinal) return null;
+
+                return (
+                  <button
+                    className="roundSimButton"
+                    onClick={() => onSimulateRound(round)}
+                  >
+                    Simulate Round
+                  </button>
+                );
+              })()}
               <h4>{stage === "KNOCKOUT" ? `R${round}` : `${stageLabel(stage)} R${round}`}</h4>
               {matches
                 .filter((m) => {

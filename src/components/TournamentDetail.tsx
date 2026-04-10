@@ -179,6 +179,7 @@ export function TournamentDetail({
       <BracketView
         tournament={tournament}
         onSimulateMatch={onSimulateMatch}
+        onSimulateRound={onSimulateRound}
         onSetMatchResult={onSetMatchResult}
         playAsParticipantId={playAsParticipantId}
       />

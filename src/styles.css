@@ -342,6 +342,12 @@ td {
   align-self: stretch;
 }
 
+.roundSimButton {
+  width: 100%;
+  font-size: 0.72rem;
+  padding: 4px 6px;
+}
+
 .compactPanel {
   padding: 10px;
 }
