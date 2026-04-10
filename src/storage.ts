@@ -59,6 +59,7 @@ function emptyHistory(name: string): ParticipantHistory {
     wins: 0,
     losses: 0,
     draws: 0,
+    currentStreak: 0,
     played: 0,
     tournaments: 0,
     completedTournaments: 0,
@@ -129,6 +130,10 @@ function normalizeHistory(
       wins: existing.wins + value.wins,
       losses: existing.losses + value.losses,
       draws: existing.draws + value.draws,
+      currentStreak:
+        typeof value.currentStreak === "number"
+          ? value.currentStreak
+          : existing.currentStreak,
       played: existing.played + value.played,
       tournaments: existing.tournaments + (value.tournaments ?? 0),
       completedTournaments:

@@ -395,6 +395,7 @@ export function HistoryPage({
       wins: entry.wins,
       draws: entry.draws,
       losses: entry.losses,
+      currentStreak: entry.currentStreak ?? 0,
       tournaments: entry.tournaments,
       completedTournaments: entry.completedTournaments,
       championships: entry.championships,
@@ -448,6 +449,20 @@ export function HistoryPage({
                 .join(""),
           ),
         cell: (ctx) => renderRecentResults(ctx.getValue<RecentResult[]>()),
+      },
+      {
+        header: "Current Streak",
+        accessorKey: "currentStreak",
+        cell: (ctx) => {
+          const streak = ctx.getValue<number>();
+          const className =
+            streak > 0
+              ? "streakValue streakPositive"
+              : streak < 0
+                ? "streakValue streakNegative"
+                : "streakValue";
+          return <span className={className}>{streak > 0 ? `+${streak}` : streak}</span>;
+        },
       },
       {
         header: "Peak Elo",

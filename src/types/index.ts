@@ -19,6 +19,7 @@ export type ParticipantHistory = {
   wins: number;
   losses: number;
   draws: number;
+  currentStreak: number;
   played: number;
   tournaments: number;
   completedTournaments: number;
