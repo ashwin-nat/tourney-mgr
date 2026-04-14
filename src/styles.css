@@ -1,7 +1,8 @@
 :root {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  color: #132238;
-  background: linear-gradient(160deg, #edf4ff, #f4f7fb 60%, #e9f2ff);
+  color: #d9e5f6;
+  background: linear-gradient(160deg, #090f19, #0f1726 60%, #121c2f);
+  color-scheme: dark;
 }
 
 * {
@@ -10,6 +11,9 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  color: inherit;
+  background: inherit;
 }
 
 .pageRoot {
@@ -36,11 +40,11 @@ section {
 }
 
 .panel {
-  background: #ffffffd9;
-  border: 1px solid #d7e4f8;
+  background: #121c2edf;
+  border: 1px solid #2a3a57;
   border-radius: 14px;
   padding: 12px;
-  box-shadow: 0 8px 24px #6f8ab41c;
+  box-shadow: 0 8px 24px #00000066;
   width: 100%;
 }
 
@@ -75,7 +79,9 @@ input,
 select,
 textarea {
   border-radius: 8px;
-  border: 1px solid #bed0ea;
+  border: 1px solid #3a4f74;
+  background: #0f1726;
+  color: #dbe8ff;
   padding: 8px;
   font: inherit;
   width: 100%;
@@ -93,20 +99,20 @@ textarea {
 }
 
 button {
-  background: #0f5ec7;
-  color: white;
+  background: #4d8dff;
+  color: #eaf2ff;
   border: none;
   cursor: pointer;
 }
 
 .tabButton {
-  background: #dde9f9;
-  color: #153055;
+  background: #1b2b45;
+  color: #d4e2ff;
 }
 
 .tabButton.active {
-  background: #0f5ec7;
-  color: #ffffff;
+  background: #4d8dff;
+  color: #0f1726;
 }
 
 button:disabled {
@@ -115,11 +121,11 @@ button:disabled {
 }
 
 button.danger {
-  background: #b4233d;
+  background: #d4576b;
 }
 
 .card {
-  border: 1px solid #d5e2f6;
+  border: 1px solid #324762;
   border-radius: 10px;
   padding: 10px;
   display: flex;
@@ -129,15 +135,15 @@ button.danger {
 }
 
 .card.active {
-  border-color: #0f5ec7;
-  background: #eef5ff;
+  border-color: #4d8dff;
+  background: #1a2c46;
 }
 
 .miniCard {
-  border: 1px solid #d9e7f7;
+  border: 1px solid #334962;
   border-radius: 10px;
   padding: 8px;
-  background: #f9fcff;
+  background: #172133;
   display: grid;
   gap: 6px;
 }
@@ -158,19 +164,19 @@ button.danger {
 }
 
 .resultMark.win {
-  color: #1e8e3e;
+  color: #6ddf92;
 }
 
 .resultMark.loss {
-  color: #c5223f;
+  color: #ff7f92;
 }
 
 .resultMark.draw {
-  color: #7b8798;
+  color: #9eb0c8;
 }
 
 .resultMark.pending {
-  color: #4e6f9a;
+  color: #89a8d3;
 }
 
 .matchRow {
@@ -179,7 +185,7 @@ button.danger {
   gap: 8px;
   align-items: center;
   padding: 6px 0;
-  border-bottom: 1px dashed #d8e4f6;
+  border-bottom: 1px dashed #2b3f5d;
 }
 
 table {
@@ -189,7 +195,7 @@ table {
 
 th,
 td {
-  border-bottom: 1px solid #d9e4f3;
+  border-bottom: 1px solid #2f435f;
   padding: 6px;
   text-align: left;
 }
@@ -230,7 +236,7 @@ td {
 
 .bracketLines path {
   fill: none;
-  stroke: #98b3d7;
+  stroke: #5f7faa;
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -249,13 +255,13 @@ td {
 .roundCol > h4 {
   margin: 0;
   font-size: 0.82rem;
-  color: #35557d;
+  color: #9fbce4;
 }
 
 .ongoingRoundCol {
-  border-color: #0f5ec7;
-  background: #eaf3ff;
-  box-shadow: inset 0 0 0 1px #d5e5fb;
+  border-color: #4d8dff;
+  background: #1a2f4d;
+  box-shadow: inset 0 0 0 1px #355277;
 }
 
 .matchCard {
@@ -267,9 +273,9 @@ td {
 }
 
 .matchCard.trackedMatch {
-  border-color: #f3c12f;
-  background: linear-gradient(135deg, #fff9e6, #fff4ce);
-  box-shadow: 0 0 0 1px #f3c12f66;
+  border-color: #f2c766;
+  background: linear-gradient(135deg, #2d2717, #3a3118);
+  box-shadow: 0 0 0 1px #f2c76666;
 }
 
 .matchCard button {
@@ -297,10 +303,10 @@ td {
   gap: 6px;
   width: 100%;
   padding: 4px 6px;
-  border: 1px solid #cddcf0;
+  border: 1px solid #375070;
   border-radius: 7px;
-  background: #ffffff;
-  color: #173a66;
+  background: #0f1726;
+  color: #dbe8ff;
   font-weight: 600;
 }
 
@@ -312,28 +318,28 @@ td {
 }
 
 .namePick.win {
-  border-color: #9fd8b3;
-  background: #e8f7ee;
+  border-color: #3f7f5a;
+  background: #143122;
 }
 
 .namePick.loss {
-  border-color: #efb5be;
-  background: #fdebec;
+  border-color: #8b4a59;
+  background: #361a22;
 }
 
 .namePick.draw {
-  border-color: #d3dce7;
-  background: #eff3f8;
+  border-color: #4d5f78;
+  background: #1c2838;
 }
 
 .namePick.pending {
-  border-color: #cddcf0;
-  background: #ffffff;
+  border-color: #375070;
+  background: #0f1726;
 }
 
 .namePick.trackedParticipant {
-  border-color: #d89f05;
-  box-shadow: inset 0 0 0 1px #f3c12f;
+  border-color: #d9b25d;
+  box-shadow: inset 0 0 0 1px #f2c766;
 }
 
 .simButton {
@@ -384,8 +390,8 @@ td {
 
 .matrixTable th,
 .matrixTable td {
-  border-bottom: 1px solid #d9e4f3;
-  border-right: 1px solid #ecf1f8;
+  border-bottom: 1px solid #2f435f;
+  border-right: 1px solid #24364f;
   padding: 4px 6px;
   white-space: nowrap;
   text-align: center;
@@ -397,16 +403,16 @@ td {
   position: sticky;
   left: 0;
   z-index: 3;
-  background: #f7fbff;
-  box-shadow: 1px 0 0 #d9e4f3;
+  background: #1a273a;
+  box-shadow: 1px 0 0 #2f435f;
 }
 
 .matrixTable tbody th {
   position: sticky;
   left: 0;
   z-index: 2;
-  background: #f9fcff;
-  box-shadow: 1px 0 0 #d9e4f3;
+  background: #172133;
+  box-shadow: 1px 0 0 #2f435f;
 }
 
 .matrixTable th {
@@ -418,15 +424,15 @@ td {
 }
 
 .diagCell {
-  color: #8ca0b8;
+  color: #8496ad;
 }
 
 .championBlock {
   margin-top: 10px;
   padding: 12px;
   border-radius: 10px;
-  border: 2px solid #f3c12f;
-  background: linear-gradient(135deg, #fff8de, #ffefb8);
+  border: 2px solid #f2c766;
+  background: linear-gradient(135deg, #322913, #453713);
 }
 
 .championBlock h4 {
@@ -451,18 +457,18 @@ td {
 }
 
 .historyTable tbody tr:hover {
-  background: #f5f9ff;
+  background: #1b2b45;
 }
 
 .selectedRow {
-  background: #eaf3ff;
+  background: #1a2f4d;
 }
 
 .linkButton {
   border: none;
   background: transparent;
   padding: 0;
-  color: #0f5ec7;
+  color: #4d8dff;
   text-decoration: underline;
   cursor: pointer;
   font: inherit;
@@ -491,44 +497,44 @@ td {
 }
 
 .recentBadgeWin {
-  background: #e8f7ee;
-  color: #16743a;
-  border-color: #9fd8b3;
+  background: #143122;
+  color: #63d187;
+  border-color: #3f7f5a;
 }
 
 .recentBadgeLoss {
-  background: #fdebec;
-  color: #b4233d;
-  border-color: #f0b3bf;
+  background: #361a22;
+  color: #d4576b;
+  border-color: #8a4e5a;
 }
 
 .recentBadgeDraw {
-  background: #eef2f7;
-  color: #5f7086;
-  border-color: #cfd8e3;
+  background: #1c2737;
+  color: #a4b5ca;
+  border-color: #4f6178;
 }
 
 .recentEmpty {
-  color: #7b8798;
+  color: #9eb0c8;
 }
 
 .streakValue {
   font-weight: 700;
-  color: #5f7086;
+  color: #a4b5ca;
 }
 
 .streakPositive {
-  color: #16743a;
+  color: #63d187;
 }
 
 .streakNegative {
-  color: #b4233d;
+  color: #d4576b;
 }
 
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background: #0b1a2b80;
+  background: #050b158a;
   display: grid;
   place-items: center;
   padding: 16px;
@@ -539,11 +545,11 @@ td {
   width: min(900px, 100%);
   max-height: min(80vh, 760px);
   overflow: auto;
-  background: #ffffff;
-  border: 1px solid #d7e4f8;
+  background: #0f1726;
+  border: 1px solid #2a3a57;
   border-radius: 14px;
   padding: 12px;
-  box-shadow: 0 12px 40px #12284a33;
+  box-shadow: 0 12px 40px #00000080;
 }
 
 .modalHeader {
@@ -552,7 +558,7 @@ td {
 }
 
 details {
-  border: 1px dashed #c4d5ed;
+  border: 1px dashed #3a4f73;
   border-radius: 10px;
   padding: 8px;
 }
@@ -567,3 +573,4 @@ summary {
     grid-template-columns: 1fr;
   }
 }
+
