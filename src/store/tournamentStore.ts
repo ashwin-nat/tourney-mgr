@@ -116,6 +116,8 @@ function ensureHistoryEntry(
     if (typeof existing.peakElo !== "number") existing.peakElo = existing.elo;
     if (typeof existing.eloMatches !== "number") existing.eloMatches = 0;
     if (typeof existing.currentStreak !== "number") existing.currentStreak = 0;
+    if (typeof existing.bestStreak !== "number") existing.bestStreak = 0;
+    if (typeof existing.worstStreak !== "number") existing.worstStreak = 0;
     if (!existing.opponents) existing.opponents = {};
     if (typeof existing.tournaments !== "number") existing.tournaments = 0;
     if (typeof existing.completedTournaments !== "number") existing.completedTournaments = 0;
@@ -141,6 +143,8 @@ function ensureHistoryEntry(
     losses: 0,
     draws: 0,
     currentStreak: 0,
+    bestStreak: 0,
+    worstStreak: 0,
     played: 0,
     tournaments: 0,
     completedTournaments: 0,
@@ -159,7 +163,7 @@ function ensureHistoryEntry(
   return created;
 }
 
-function updateCurrentStreak(
+function updateStreaks(
   entry: ParticipantHistory,
   outcome: "W" | "L" | "D",
 ): void {
@@ -169,9 +173,11 @@ function updateCurrentStreak(
   }
   if (outcome === "W") {
     entry.currentStreak = entry.currentStreak > 0 ? entry.currentStreak + 1 : 1;
+    entry.bestStreak = Math.max(entry.bestStreak, entry.currentStreak);
     return;
   }
   entry.currentStreak = entry.currentStreak < 0 ? entry.currentStreak - 1 : -1;
+  entry.worstStreak = Math.min(entry.worstStreak, entry.currentStreak);
 }
 
 function stageKey(stage: MatchStage): keyof ParticipantHistory["stageStats"] {
@@ -252,8 +258,8 @@ function deriveHistoryFromTournaments(
       if (match.winner === undefined) {
         a.draws += 1;
         b.draws += 1;
-        updateCurrentStreak(a, "D");
-        updateCurrentStreak(b, "D");
+        updateStreaks(a, "D");
+        updateStreaks(b, "D");
         a.stageStats[stage].draws += 1;
         b.stageStats[stage].draws += 1;
         aVs.draws += 1;
@@ -261,8 +267,8 @@ function deriveHistoryFromTournaments(
       } else if (match.winner === match.playerA) {
         a.wins += 1;
         b.losses += 1;
-        updateCurrentStreak(a, "W");
-        updateCurrentStreak(b, "L");
+        updateStreaks(a, "W");
+        updateStreaks(b, "L");
         a.stageStats[stage].wins += 1;
         b.stageStats[stage].losses += 1;
         aVs.wins += 1;
@@ -270,8 +276,8 @@ function deriveHistoryFromTournaments(
       } else if (match.winner === match.playerB) {
         b.wins += 1;
         a.losses += 1;
-        updateCurrentStreak(b, "W");
-        updateCurrentStreak(a, "L");
+        updateStreaks(b, "W");
+        updateStreaks(a, "L");
         b.stageStats[stage].wins += 1;
         a.stageStats[stage].losses += 1;
         bVs.wins += 1;

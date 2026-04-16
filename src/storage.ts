@@ -60,6 +60,8 @@ function emptyHistory(name: string): ParticipantHistory {
     losses: 0,
     draws: 0,
     currentStreak: 0,
+    bestStreak: 0,
+    worstStreak: 0,
     played: 0,
     tournaments: 0,
     completedTournaments: 0,
@@ -134,6 +136,14 @@ function normalizeHistory(
         typeof value.currentStreak === "number"
           ? value.currentStreak
           : existing.currentStreak,
+      bestStreak: Math.max(
+        typeof existing.bestStreak === "number" ? existing.bestStreak : 0,
+        typeof value.bestStreak === "number" ? value.bestStreak : 0,
+      ),
+      worstStreak: Math.min(
+        typeof existing.worstStreak === "number" ? existing.worstStreak : 0,
+        typeof value.worstStreak === "number" ? value.worstStreak : 0,
+      ),
       played: existing.played + value.played,
       tournaments: existing.tournaments + (value.tournaments ?? 0),
       completedTournaments:

@@ -396,6 +396,8 @@ export function HistoryPage({
       draws: entry.draws,
       losses: entry.losses,
       currentStreak: entry.currentStreak ?? 0,
+      bestStreak: entry.bestStreak ?? 0,
+      worstStreak: entry.worstStreak ?? 0,
       tournaments: entry.tournaments,
       completedTournaments: entry.completedTournaments,
       championships: entry.championships,
@@ -462,6 +464,30 @@ export function HistoryPage({
                 ? "streakValue streakNegative"
                 : "streakValue";
           return <span className={className}>{streak > 0 ? `+${streak}` : streak}</span>;
+        },
+      },
+      {
+        header: "Best Streak",
+        accessorKey: "bestStreak",
+        cell: (ctx) => {
+          const streak = ctx.getValue<number>();
+          return (
+            <span className={streak > 0 ? "streakValue streakPositive" : "streakValue"}>
+              {streak > 0 ? `+${streak}` : streak}
+            </span>
+          );
+        },
+      },
+      {
+        header: "Worst Streak",
+        accessorKey: "worstStreak",
+        cell: (ctx) => {
+          const streak = ctx.getValue<number>();
+          return (
+            <span className={streak < 0 ? "streakValue streakNegative" : "streakValue"}>
+              {streak}
+            </span>
+          );
         },
       },
       {
