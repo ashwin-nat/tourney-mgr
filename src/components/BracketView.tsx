@@ -11,6 +11,7 @@ type Props = {
   tournament: Tournament;
   onSimulateMatch: (matchId: string) => void;
   onSimulateRound: (round: number) => void;
+  onSimulateStage: (stage: Match["stage"]) => void;
   onSetMatchResult: (matchId: string, winnerId: string) => void;
   playAsParticipantId?: string | null;
 };
@@ -55,6 +56,7 @@ export function BracketView({
   tournament,
   onSimulateMatch,
   onSimulateRound,
+  onSimulateStage,
   onSetMatchResult,
   playAsParticipantId = null,
 }: Props) {
@@ -89,6 +91,8 @@ export function BracketView({
   const leagueRounds = useMemo(() => roundsForStage("LEAGUE"), [matches]);
   const leaguePageSize = 5;
   const leaguePageCount = Math.max(1, Math.ceil(leagueRounds.length / leaguePageSize));
+  const hasUnplayedStageMatches = (stage: Match["stage"]) =>
+    matches.some((match) => match.stage === stage && !match.played);
 
   useEffect(() => {
     setLeagueRoundPage(0);
@@ -370,11 +374,27 @@ export function BracketView({
       {format === "GROUP_KO" ? (
         <div className="stack">
           <section>
-            <h4>Group Stage</h4>
+            <div className="sectionHeaderRow">
+              <h4>Group Stage</h4>
+              <button
+                onClick={() => onSimulateStage("GROUP")}
+                disabled={!hasUnplayedStageMatches("GROUP")}
+              >
+                Simulate Stage
+              </button>
+            </div>
             {renderRoundsForStage("GROUP")}
           </section>
           <section>
-            <h4>Knockout Stage</h4>
+            <div className="sectionHeaderRow">
+              <h4>Knockout Stage</h4>
+              <button
+                onClick={() => onSimulateStage("KNOCKOUT")}
+                disabled={!hasUnplayedStageMatches("KNOCKOUT")}
+              >
+                Simulate Stage
+              </button>
+            </div>
             {availableKoTracks.length
               ? availableKoTracks.map((track) => (
                   <div key={track} className="stack">
@@ -387,6 +407,15 @@ export function BracketView({
         </div>
       ) : format === "LEAGUE" ? (
         <div className="stack">
+          <div className="sectionHeaderRow">
+            <h4>League Stage</h4>
+            <button
+              onClick={() => onSimulateStage("LEAGUE")}
+              disabled={!hasUnplayedStageMatches("LEAGUE")}
+            >
+              Simulate Stage
+            </button>
+          </div>
           <div className="row">
             <button
               onClick={() => setLeagueRoundPage((current) => Math.max(0, current - 1))}
@@ -419,14 +448,36 @@ export function BracketView({
       ) : (
         <>
           {format === "SWISS" ? (
-            renderRoundsForStage("SWISS")
-          ) : availableKoTracks.length ? (
-            availableKoTracks.map((track) => (
-              <div key={track} className="stack">
-                <h4>{knockoutBracketLabel(track)}</h4>
-                {renderRoundsForStage("KNOCKOUT", undefined, track)}
+            <div className="stack">
+              <div className="sectionHeaderRow">
+                <h4>Swiss Stage</h4>
+                <button
+                  onClick={() => onSimulateStage("SWISS")}
+                  disabled={!hasUnplayedStageMatches("SWISS")}
+                >
+                  Simulate Stage
+                </button>
               </div>
-            ))
+              {renderRoundsForStage("SWISS")}
+            </div>
+          ) : availableKoTracks.length ? (
+            <div className="stack">
+              <div className="sectionHeaderRow">
+                <h4>Knockout Stage</h4>
+                <button
+                  onClick={() => onSimulateStage("KNOCKOUT")}
+                  disabled={!hasUnplayedStageMatches("KNOCKOUT")}
+                >
+                  Simulate Stage
+                </button>
+              </div>
+              {availableKoTracks.map((track) => (
+                <div key={track} className="stack">
+                  <h4>{knockoutBracketLabel(track)}</h4>
+                  {renderRoundsForStage("KNOCKOUT", undefined, track)}
+                </div>
+              ))}
+            </div>
           ) : (
             <p>No bracket generated yet.</p>
           )}

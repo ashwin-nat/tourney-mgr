@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildStandings } from "../engine/standings";
-import type { ParticipantHistory, Tournament } from "../types";
+import type { MatchStage, ParticipantHistory, Tournament } from "../types";
 import { BracketView } from "./BracketView";
 import { HeadToHeadMatrix } from "./HeadToHeadMatrix";
 import { StandingsTable } from "./StandingsTable";
@@ -13,6 +13,7 @@ type Props = {
   onSimulateMatch: (matchId: string) => void;
   onSetMatchResult: (matchId: string, winnerId: string) => void;
   onSimulateRound: (round: number) => void;
+  onSimulateStage: (stage?: MatchStage) => void;
   onSimulateAll: () => void;
   onReset: () => void;
   onRatingChange: (participantId: string, rating: number) => void;
@@ -27,13 +28,16 @@ export function TournamentDetail({
   onSimulateMatch,
   onSetMatchResult,
   onSimulateRound,
+  onSimulateStage,
   onSimulateAll,
   onReset,
   onRatingChange,
   onPlayAsParticipantChange,
 }: Props) {
   const [isPlayAsModalOpen, setIsPlayAsModalOpen] = useState(false);
-  const nextRound = tournament.matches.find((m) => !m.played)?.round;
+  const nextUnplayedMatch = tournament.matches.find((m) => !m.played);
+  const nextRound = nextUnplayedMatch?.round;
+  const hasPendingStage = Boolean(nextUnplayedMatch?.stage);
   const groupStageMatches = tournament.matches.filter((m) => m.stage === "GROUP");
   const playAsParticipant = useMemo(
     () =>
@@ -82,6 +86,9 @@ export function TournamentDetail({
         <button onClick={onGenerateFixtures}>Generate Fixtures</button>
         <button onClick={onSimulateAll} disabled={!tournament.matches.length}>
           Simulate All
+        </button>
+        <button onClick={() => onSimulateStage()} disabled={!hasPendingStage}>
+          Simulate Stage
         </button>
         <button
           onClick={() => nextRound && onSimulateRound(nextRound)}
@@ -180,6 +187,7 @@ export function TournamentDetail({
         tournament={tournament}
         onSimulateMatch={onSimulateMatch}
         onSimulateRound={onSimulateRound}
+        onSimulateStage={onSimulateStage}
         onSetMatchResult={onSetMatchResult}
         playAsParticipantId={playAsParticipantId}
       />

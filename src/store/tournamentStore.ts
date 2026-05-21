@@ -52,6 +52,7 @@ type Store = {
   simulateMatch: (id: string, matchId: string) => void;
   setMatchResult: (id: string, matchId: string, winnerId: string) => void;
   simulateRound: (id: string, round: number) => void;
+  simulateStage: (id: string, stage?: MatchStage) => void;
   simulateAll: (id: string) => void;
   resetTournament: (id: string) => void;
   clearAll: () => void;
@@ -635,6 +636,50 @@ export const useTournamentStore = create<Store>((set, get) => ({
           .filter((m) => !m.played && m.round === round)
           .map((m) => m.id);
         return applyMatchSimulation(t, matchIds, state.participantHistory);
+      });
+      return {
+        tournaments,
+        currentTournamentId: state.currentTournamentId,
+        participantHistory: deriveHistoryFromTournaments(tournaments),
+      };
+    });
+  },
+
+  simulateStage(id, stage) {
+    applyAndPersist(get, set, (state) => {
+      const indexById = new Map(state.tournaments.map((tournament, index) => [tournament.id, index]));
+      const tournaments = state.tournaments.map((t) => {
+        if (t.id !== id) return t;
+        let current = t;
+        let history = state.participantHistory;
+        const targetStage = stage ?? current.matches.find((match) => !match.played)?.stage;
+        if (!targetStage) return current;
+
+        for (let guard = 0; guard < 1000; guard += 1) {
+          const nextUnplayedInTargetStage = current.matches.find(
+            (match) => !match.played && match.stage === targetStage,
+          );
+          if (!nextUnplayedInTargetStage) break;
+          const currentRound = nextUnplayedInTargetStage.round;
+          const roundIds = current.matches
+            .filter(
+              (match) =>
+                !match.played &&
+                match.stage === targetStage &&
+                match.round === currentRound,
+            )
+            .map((match) => match.id);
+          current = applyMatchSimulation(current, roundIds, history);
+          const tournamentsWithCurrent = [...state.tournaments];
+          const currentIndex = indexById.get(current.id);
+          if (currentIndex !== undefined) {
+            tournamentsWithCurrent[currentIndex] = current;
+            history = deriveHistoryFromTournaments(tournamentsWithCurrent);
+          }
+          if (current.status === "COMPLETED") break;
+        }
+
+        return current;
       });
       return {
         tournaments,

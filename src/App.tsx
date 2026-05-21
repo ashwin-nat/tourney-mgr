@@ -23,6 +23,7 @@ export default function App() {
     simulateMatch,
     setMatchResult,
     simulateRound,
+    simulateStage,
     simulateAll,
     resetTournament,
     clearAll,
@@ -119,6 +120,7 @@ export default function App() {
                   setMatchResult(current.id, matchId, winnerId)
                 }
                 onSimulateRound={(round) => simulateRound(current.id, round)}
+                onSimulateStage={(stage) => simulateStage(current.id, stage)}
                 onSimulateAll={() => simulateAll(current.id)}
                 onReset={() => resetTournament(current.id)}
                 onRatingChange={(participantId, rating) =>
