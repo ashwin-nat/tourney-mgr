@@ -99,11 +99,49 @@ function knockoutParticipants(matches: Match[]): string[] {
   );
 }
 
+function inferStartingBracketByParticipant(
+  koMatches: Match[],
+): Map<string, NonNullable<Match["knockoutBracket"] | "UNSPECIFIED">> {
+  const earliestRoundByParticipant = new Map<string, number>();
+  for (const match of koMatches) {
+    const participants = [match.playerA, match.playerB].filter((id) => id !== BYE_ID);
+    for (const participantId of participants) {
+      const existingRound = earliestRoundByParticipant.get(participantId);
+      if (existingRound === undefined || match.round < existingRound) {
+        earliestRoundByParticipant.set(participantId, match.round);
+      }
+    }
+  }
+
+  const startingBracket = new Map<
+    string,
+    NonNullable<Match["knockoutBracket"] | "UNSPECIFIED">
+  >();
+  for (const match of koMatches) {
+    const participants = [match.playerA, match.playerB].filter((id) => id !== BYE_ID);
+    for (const participantId of participants) {
+      if (earliestRoundByParticipant.get(participantId) !== match.round) continue;
+      const inferredBracket = match.knockoutBracket ?? "UNSPECIFIED";
+      const existing = startingBracket.get(participantId);
+      if (existing === "UPPER" || existing === "UNSPECIFIED") continue;
+      if (inferredBracket === "UPPER" || inferredBracket === "UNSPECIFIED") {
+        startingBracket.set(participantId, inferredBracket);
+      } else if (!existing) {
+        startingBracket.set(participantId, inferredBracket);
+      }
+    }
+  }
+
+  return startingBracket;
+}
+
 function calculateLossCounts(koMatches: Match[]): Map<string, number> | null {
   const losses = new Map<string, number>();
   const participants = knockoutParticipants(koMatches);
+  const startingBracket = inferStartingBracketByParticipant(koMatches);
   for (const participantId of participants) {
-    losses.set(participantId, 0);
+    // Entrants that start in lower bracket already spent their extra life.
+    losses.set(participantId, startingBracket.get(participantId) === "LOWER" ? 1 : 0);
   }
 
   for (const match of koMatches) {

@@ -135,6 +135,52 @@ describe("knockout progression", () => {
     expect([upperRound2[0].playerA, upperRound2[0].playerB].sort()).toEqual(["a", "c"]);
     expect([lowerRound2[0].playerA, lowerRound2[0].playerB].sort()).toEqual(["b", "d"]);
   });
+
+  it("keeps lower-bracket qualifiers in lower bracket after a win", () => {
+    const tournament: Tournament = {
+      id: "t4",
+      name: "group-seeded-double",
+      format: "GROUP_KO",
+      participants: [],
+      matches: [
+        {
+          id: "m1",
+          playerA: "a",
+          playerB: "c",
+          played: true,
+          winner: "a",
+          round: 2,
+          stage: "KNOCKOUT",
+          knockoutBracket: "UPPER",
+        },
+        {
+          id: "m2",
+          playerA: "b",
+          playerB: "d",
+          played: true,
+          winner: "b",
+          round: 2,
+          stage: "KNOCKOUT",
+          knockoutBracket: "LOWER",
+        },
+      ],
+      settings: { doubleElimination: true },
+      status: "IN_PROGRESS",
+      schemaVersion: 1,
+    };
+
+    const next = maybeGenerateNextKnockoutRound(tournament);
+    const upperRound3 = next.matches.filter(
+      (match) => match.round === 3 && match.knockoutBracket === "UPPER",
+    );
+    const lowerRound3 = next.matches.filter(
+      (match) => match.round === 3 && match.knockoutBracket === "LOWER",
+    );
+
+    expect(upperRound3).toHaveLength(0);
+    expect(lowerRound3).toHaveLength(1);
+    expect([lowerRound3[0].playerA, lowerRound3[0].playerB].sort()).toEqual(["b", "c"]);
+  });
 });
 
 describe("group to knockout seeding", () => {
