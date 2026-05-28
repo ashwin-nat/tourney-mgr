@@ -182,6 +182,50 @@ function getRecentResultsVsOpponent(
   return recent.reverse();
 }
 
+function getTournamentTitleStreaks(
+  tournaments: Tournament[],
+  participantName: string,
+): { current: number; max: number } {
+  const participantKey = participantName.trim().toLowerCase();
+  const completedByRecency = tournamentsByRecency(tournaments)
+    .filter((tournament) => tournament.status === "COMPLETED")
+    .filter((tournament) =>
+      tournament.participants.some(
+        (entry) => entry.name.trim().toLowerCase() === participantKey,
+      ),
+    );
+  const completedByChronologicalOrder = [...completedByRecency].reverse();
+  let current = 0;
+  let max = 0;
+  let active = 0;
+
+  for (const tournament of completedByRecency) {
+    const participant = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === participantKey,
+    );
+    if (!participant) continue;
+    const championId = getTournamentChampionId(tournament);
+    if (championId !== participant.id) break;
+    current += 1;
+  }
+
+  for (const tournament of completedByChronologicalOrder) {
+    const participant = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === participantKey,
+    );
+    if (!participant) continue;
+    const championId = getTournamentChampionId(tournament);
+    if (championId === participant.id) {
+      active += 1;
+      max = Math.max(max, active);
+    } else {
+      active = 0;
+    }
+  }
+
+  return { current, max };
+}
+
 function renderRecentResults(results: RecentResult[]): ReactNode {
   if (!results.length) {
     return <span className="recentEmpty">-</span>;
@@ -384,6 +428,7 @@ export function HistoryPage({
   );
   const participantRows = participants.map((entry) => {
     const key = entry.name.trim().toLowerCase();
+    const titleStreaks = getTournamentTitleStreaks(tournaments, entry.name);
     return {
       key,
       player: entry.name,
@@ -403,6 +448,8 @@ export function HistoryPage({
       championships: entry.championships,
       runnerUps: entry.runnerUps,
       finals: entry.finals,
+      currentTitleStreak: titleStreaks.current,
+      bestTitleStreak: titleStreaks.max,
       finalConversionRate: winRate(entry.championships, entry.finals),
       winRate: winRate(entry.wins, entry.played),
       groupWinRate: winRate(entry.stageStats.group.wins, entry.stageStats.group.played),
@@ -503,6 +550,8 @@ export function HistoryPage({
       { header: "T", accessorKey: "tournaments" },
       { header: "CT", accessorKey: "completedTournaments" },
       { header: "Titles", accessorKey: "championships" },
+      { header: "Current Title Streak", accessorKey: "currentTitleStreak" },
+      { header: "Best Title Streak", accessorKey: "bestTitleStreak" },
       { header: "RU", accessorKey: "runnerUps" },
       { header: "Finals", accessorKey: "finals" },
       {
