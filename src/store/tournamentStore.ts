@@ -35,6 +35,7 @@ import { getTournamentChampionId, getTournamentRunnerUpId } from "../utils/champ
 type Store = {
   tournaments: Tournament[];
   participantHistory: Record<string, ParticipantHistory>;
+  deletedParticipantKeys: string[];
   currentTournamentId: string | null;
   isHydrated: boolean;
   hydrate: () => Promise<void>;
@@ -48,6 +49,7 @@ type Store = {
   ) => void;
   exportStats: () => StatsTransferFile;
   importStats: (input: unknown) => { ok: true } | { ok: false; error: string };
+  deleteParticipantFromHistory: (participantName: string) => void;
   generateFixtures: (id: string) => void;
   simulateMatch: (id: string, matchId: string) => void;
   setMatchResult: (id: string, matchId: string, winnerId: string) => void;
@@ -60,7 +62,7 @@ type Store = {
 
 type PersistedSlice = Pick<
   Store,
-  "tournaments" | "participantHistory" | "currentTournamentId"
+  "tournaments" | "participantHistory" | "deletedParticipantKeys" | "currentTournamentId"
 >;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -75,12 +77,22 @@ function parseStatsTransferFile(input: unknown): StatsTransferFile | null {
   if (currentTournamentId !== null && typeof currentTournamentId !== "string") return null;
   const participantHistory = input.participantHistory;
   if (!isRecord(participantHistory)) return null;
+  const deletedParticipantKeys = input.deletedParticipantKeys;
+  if (
+    deletedParticipantKeys !== undefined &&
+    (!Array.isArray(deletedParticipantKeys) ||
+      deletedParticipantKeys.some((key) => typeof key !== "string"))
+  ) {
+    return null;
+  }
   return {
     schemaVersion:
       typeof input.schemaVersion === "number" ? input.schemaVersion : SCHEMA_VERSION,
     exportedAt: typeof input.exportedAt === "string" ? input.exportedAt : "",
     tournaments: tournaments as Tournament[],
     participantHistory: participantHistory as Record<string, ParticipantHistory>,
+    deletedParticipantKeys:
+      (deletedParticipantKeys as string[] | undefined) ?? [],
     currentTournamentId,
   };
 }
@@ -102,6 +114,11 @@ function validateParticipants(participants: Participant[]): Participant[] {
 
 function historyKey(name: string): string {
   return name.trim().toLowerCase();
+}
+
+function normalizeDeletedParticipantKeys(keys: string[] | undefined): string[] {
+  if (!Array.isArray(keys)) return [];
+  return [...new Set(keys.map((key) => historyKey(key)).filter(Boolean))];
 }
 
 function ensureHistoryEntry(
@@ -190,8 +207,10 @@ function stageKey(stage: MatchStage): keyof ParticipantHistory["stageStats"] {
 
 function deriveHistoryFromTournaments(
   tournaments: Tournament[],
+  deletedParticipantKeys: string[] = [],
 ): Record<string, ParticipantHistory> {
   const history: Record<string, ParticipantHistory> = {};
+  const deletedKeySet = new Set(normalizeDeletedParticipantKeys(deletedParticipantKeys));
 
   for (const tournament of [...tournaments].reverse()) {
     const idToName = new Map(
@@ -202,6 +221,7 @@ function deriveHistoryFromTournaments(
       const name = participant.name.trim();
       if (!name) continue;
       const key = historyKey(name);
+      if (deletedKeySet.has(key)) continue;
       if (seenThisTournament.has(key)) continue;
       seenThisTournament.add(key);
       const entry = ensureHistoryEntry(history, name);
@@ -226,6 +246,9 @@ function deriveHistoryFromTournaments(
       const playerAName = idToName.get(match.playerA);
       const playerBName = idToName.get(match.playerB);
       if (!playerAName || !playerBName) continue;
+      const playerAKey = historyKey(playerAName);
+      const playerBKey = historyKey(playerBName);
+      if (deletedKeySet.has(playerAKey) || deletedKeySet.has(playerBKey)) continue;
 
       const a = ensureHistoryEntry(history, playerAName);
       const b = ensureHistoryEntry(history, playerBName);
@@ -303,7 +326,7 @@ function deriveHistoryFromTournaments(
       const championId = getTournamentChampionId(tournament);
       if (championId) {
         const championName = idToName.get(championId);
-        if (championName) {
+        if (championName && !deletedKeySet.has(historyKey(championName))) {
           const championEntry = ensureHistoryEntry(history, championName);
           championEntry.championships += 1;
           championEntry.finals += 1;
@@ -313,7 +336,7 @@ function deriveHistoryFromTournaments(
       const runnerUpId = getTournamentRunnerUpId(tournament);
       if (runnerUpId) {
         const runnerUpName = idToName.get(runnerUpId);
-        if (runnerUpName) {
+        if (runnerUpName && !deletedKeySet.has(historyKey(runnerUpName))) {
           const runnerUpEntry = ensureHistoryEntry(history, runnerUpName);
           runnerUpEntry.runnerUps += 1;
           runnerUpEntry.finals += 1;
@@ -409,6 +432,7 @@ async function persist(state: PersistedSlice): Promise<void> {
   await StorageService.saveState(
     state.tournaments,
     state.participantHistory,
+    state.deletedParticipantKeys,
     state.currentTournamentId,
   );
 }
@@ -427,6 +451,7 @@ function applyAndPersist(
 export const useTournamentStore = create<Store>((set, get) => ({
   tournaments: [],
   participantHistory: {},
+  deletedParticipantKeys: [],
   currentTournamentId: null,
   isHydrated: false,
 
@@ -438,7 +463,13 @@ export const useTournamentStore = create<Store>((set, get) => ({
         ...tournament,
         schemaVersion: tournament.schemaVersion ?? SCHEMA_VERSION,
       }));
-      const derivedHistory = deriveHistoryFromTournaments(tournaments);
+      const deletedParticipantKeys = normalizeDeletedParticipantKeys(
+        loaded.deletedParticipantKeys,
+      );
+      const derivedHistory = deriveHistoryFromTournaments(
+        tournaments,
+        deletedParticipantKeys,
+      );
       const participantHistory =
         Object.keys(derivedHistory).length > 0 ? derivedHistory : loaded.participantHistory;
       const currentTournamentId = tournaments.some((t) => t.id === loaded.currentTournamentId)
@@ -447,6 +478,7 @@ export const useTournamentStore = create<Store>((set, get) => ({
       const next = {
         tournaments,
         participantHistory,
+        deletedParticipantKeys,
         currentTournamentId,
       };
       set({ ...next, isHydrated: true });
@@ -460,6 +492,7 @@ export const useTournamentStore = create<Store>((set, get) => ({
     applyAndPersist(get, set, (state) => ({
       tournaments: state.tournaments,
       participantHistory: state.participantHistory,
+      deletedParticipantKeys: state.deletedParticipantKeys,
       currentTournamentId: id,
     }));
   },
@@ -484,7 +517,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId: tournament.id,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -499,7 +536,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -518,7 +559,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId: state.currentTournamentId,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -530,6 +575,7 @@ export const useTournamentStore = create<Store>((set, get) => ({
       exportedAt: new Date().toISOString(),
       tournaments: state.tournaments,
       participantHistory: state.participantHistory,
+      deletedParticipantKeys: state.deletedParticipantKeys,
       currentTournamentId: state.currentTournamentId,
     };
   },
@@ -541,7 +587,13 @@ export const useTournamentStore = create<Store>((set, get) => ({
       ...tournament,
       schemaVersion: tournament.schemaVersion ?? SCHEMA_VERSION,
     }));
-    const participantHistoryFromTournaments = deriveHistoryFromTournaments(tournaments);
+    const deletedParticipantKeys = normalizeDeletedParticipantKeys(
+      parsed.deletedParticipantKeys,
+    );
+    const participantHistoryFromTournaments = deriveHistoryFromTournaments(
+      tournaments,
+      deletedParticipantKeys,
+    );
     const participantHistory =
       Object.keys(participantHistoryFromTournaments).length > 0
         ? participantHistoryFromTournaments
@@ -554,11 +606,39 @@ export const useTournamentStore = create<Store>((set, get) => ({
     const next = {
       tournaments,
       participantHistory,
+      deletedParticipantKeys,
       currentTournamentId,
     };
     set(next);
     void persist(next);
     return { ok: true };
+  },
+
+  deleteParticipantFromHistory(participantName) {
+    applyAndPersist(get, set, (state) => {
+      const deletedParticipantKey = historyKey(participantName);
+      if (!deletedParticipantKey) {
+        return {
+          tournaments: state.tournaments,
+          participantHistory: state.participantHistory,
+          deletedParticipantKeys: state.deletedParticipantKeys,
+          currentTournamentId: state.currentTournamentId,
+        };
+      }
+      const deletedParticipantKeys = normalizeDeletedParticipantKeys([
+        ...state.deletedParticipantKeys,
+        deletedParticipantKey,
+      ]);
+      return {
+        tournaments: state.tournaments,
+        currentTournamentId: state.currentTournamentId,
+        deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          state.tournaments,
+          deletedParticipantKeys,
+        ),
+      };
+    });
   },
 
   generateFixtures(id) {
@@ -597,7 +677,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId: state.currentTournamentId,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -610,7 +694,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId: state.currentTournamentId,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -623,7 +711,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId: state.currentTournamentId,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -640,7 +732,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId: state.currentTournamentId,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -674,7 +770,10 @@ export const useTournamentStore = create<Store>((set, get) => ({
           const currentIndex = indexById.get(current.id);
           if (currentIndex !== undefined) {
             tournamentsWithCurrent[currentIndex] = current;
-            history = deriveHistoryFromTournaments(tournamentsWithCurrent);
+            history = deriveHistoryFromTournaments(
+              tournamentsWithCurrent,
+              state.deletedParticipantKeys,
+            );
           }
           if (current.status === "COMPLETED") break;
         }
@@ -684,7 +783,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId: state.currentTournamentId,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -708,7 +811,10 @@ export const useTournamentStore = create<Store>((set, get) => ({
           const currentIndex = indexById.get(current.id);
           if (currentIndex !== undefined) {
             tournamentsWithCurrent[currentIndex] = current;
-            history = deriveHistoryFromTournaments(tournamentsWithCurrent);
+            history = deriveHistoryFromTournaments(
+              tournamentsWithCurrent,
+              state.deletedParticipantKeys,
+            );
           }
           if (current.status === "COMPLETED") break;
         }
@@ -717,7 +823,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId: state.currentTournamentId,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -736,7 +846,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
       return {
         tournaments,
         currentTournamentId: state.currentTournamentId,
-        participantHistory: deriveHistoryFromTournaments(tournaments),
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
       };
     });
   },
@@ -746,6 +860,7 @@ export const useTournamentStore = create<Store>((set, get) => ({
       tournaments: [],
       currentTournamentId: null,
       participantHistory: {},
+      deletedParticipantKeys: [],
     };
     set(next);
     void persist(next);

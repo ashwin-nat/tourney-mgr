@@ -20,6 +20,7 @@ export default function App() {
     exportStats,
     generateFixtures,
     importStats,
+    deleteParticipantFromHistory,
     simulateMatch,
     setMatchResult,
     simulateRound,
@@ -149,6 +150,7 @@ export default function App() {
           participantHistory={participantHistory}
           onExportStats={exportStats}
           onImportStats={importStats}
+          onDeleteParticipantHistory={deleteParticipantFromHistory}
           onClearAll={() => {
             clearAll();
             setPlayAsByTournamentId({});

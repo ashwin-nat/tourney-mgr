@@ -116,5 +116,6 @@ export type StatsTransferFile = {
   exportedAt: string;
   tournaments: Tournament[];
   participantHistory: Record<string, ParticipantHistory>;
+  deletedParticipantKeys: string[];
   currentTournamentId: string | null;
 };

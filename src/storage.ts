@@ -13,6 +13,7 @@ type StoredPayload = {
   schemaVersion: number;
   tournaments: Tournament[];
   participantHistory?: Record<string, ParticipantHistory>;
+  deletedParticipantKeys?: string[];
   currentTournamentId: string | null;
 };
 
@@ -20,11 +21,13 @@ type StoredPayloadLegacy = {
   schemaVersion: number;
   tournaments: Tournament[];
   participantHistory?: Record<string, ParticipantHistory>;
+  deletedParticipantKeys?: string[];
 };
 
 type LoadedState = {
   tournaments: Tournament[];
   participantHistory: Record<string, ParticipantHistory>;
+  deletedParticipantKeys: string[];
   currentTournamentId: string | null;
 };
 
@@ -195,6 +198,14 @@ function normalizeHistory(
   return normalized;
 }
 
+function normalizeDeletedParticipantKeys(keys: string[] | undefined): string[] {
+  if (!Array.isArray(keys)) return [];
+  const normalized = keys
+    .map((key) => normalizeNameKey(String(key)))
+    .filter(Boolean);
+  return [...new Set(normalized)];
+}
+
 function parseLegacyPayload(): LoadedState | null {
   try {
     const raw = localStorage.getItem(TOURNAMENTS_KEY);
@@ -204,6 +215,9 @@ function parseLegacyPayload(): LoadedState | null {
     return {
       tournaments: parsed.tournaments,
       participantHistory: normalizeHistory(parsed.participantHistory),
+      deletedParticipantKeys: normalizeDeletedParticipantKeys(
+        parsed.deletedParticipantKeys,
+      ),
       currentTournamentId: localStorage.getItem(CURRENT_KEY),
     };
   } catch {
@@ -215,6 +229,7 @@ function parseLoadedPayload(payload: StoredPayload): LoadedState {
   return {
     tournaments: payload.tournaments,
     participantHistory: normalizeHistory(payload.participantHistory),
+    deletedParticipantKeys: normalizeDeletedParticipantKeys(payload.deletedParticipantKeys),
     currentTournamentId: payload.currentTournamentId ?? null,
   };
 }
@@ -268,6 +283,7 @@ export const StorageService = {
       await this.saveState(
         legacyIndexedDb.tournaments,
         legacyIndexedDb.participantHistory,
+        legacyIndexedDb.deletedParticipantKeys,
         legacyIndexedDb.currentTournamentId,
       );
       return legacyIndexedDb;
@@ -278,6 +294,7 @@ export const StorageService = {
       await this.saveState(
         legacyLocalStorage.tournaments,
         legacyLocalStorage.participantHistory,
+        legacyLocalStorage.deletedParticipantKeys,
         legacyLocalStorage.currentTournamentId,
       );
       localStorage.removeItem(TOURNAMENTS_KEY);
@@ -288,6 +305,7 @@ export const StorageService = {
     return {
       tournaments: [],
       participantHistory: {},
+      deletedParticipantKeys: [],
       currentTournamentId: null,
     };
   },
@@ -295,12 +313,14 @@ export const StorageService = {
   async saveState(
     tournaments: Tournament[],
     participantHistory: Record<string, ParticipantHistory>,
+    deletedParticipantKeys: string[],
     currentTournamentId: string | null,
   ): Promise<void> {
     const payload: StoredPayload = {
       schemaVersion: 1,
       tournaments,
       participantHistory: normalizeHistory(participantHistory),
+      deletedParticipantKeys: normalizeDeletedParticipantKeys(deletedParticipantKeys),
       currentTournamentId,
     };
     await db.app_state.put({ key: STATE_KEY, payload });

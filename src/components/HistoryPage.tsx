@@ -21,6 +21,7 @@ type Props = {
   onClearAll: () => void;
   onExportStats: () => StatsTransferFile;
   onImportStats: (input: unknown) => { ok: true } | { ok: false; error: string };
+  onDeleteParticipantHistory: (participantName: string) => void;
 };
 
 function pct(value: number): string {
@@ -263,6 +264,7 @@ export function HistoryPage({
   onClearAll,
   onExportStats,
   onImportStats,
+  onDeleteParticipantHistory,
 }: Props) {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importMessage, setImportMessage] = useState<string>("");
@@ -809,6 +811,20 @@ export function HistoryPage({
               <h3>{selectedParticipant.name} Detailed Stats</h3>
               <button
                 className="danger"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Delete ${selectedParticipant.name} from history? This removes their influence from aggregate stats and cannot be undone.`,
+                    )
+                  ) {
+                    onDeleteParticipantHistory(selectedParticipant.name);
+                    setSelectedParticipantKey(null);
+                  }
+                }}
+              >
+                Delete from History
+              </button>
+              <button
                 onClick={() => setSelectedParticipantKey(null)}
               >
                 Close

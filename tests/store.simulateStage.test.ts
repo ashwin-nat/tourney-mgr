@@ -6,6 +6,7 @@ vi.mock("../src/storage", () => ({
     loadState: vi.fn(async () => ({
       tournaments: [],
       participantHistory: {},
+      deletedParticipantKeys: [],
       currentTournamentId: null,
     })),
     saveState: vi.fn(async () => {}),
