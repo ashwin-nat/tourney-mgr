@@ -47,6 +47,7 @@ type Store = {
     participantId: string,
     rating: number,
   ) => void;
+  updateParticipantOverall: (participantName: string, rating: number) => void;
   exportStats: () => StatsTransferFile;
   importStats: (input: unknown) => { ok: true } | { ok: false; error: string };
   deleteParticipantFromHistory: (participantName: string) => void;
@@ -556,6 +557,38 @@ export const useTournamentStore = create<Store>((set, get) => ({
           ),
         };
       });
+      return {
+        tournaments,
+        currentTournamentId: state.currentTournamentId,
+        deletedParticipantKeys: state.deletedParticipantKeys,
+        participantHistory: deriveHistoryFromTournaments(
+          tournaments,
+          state.deletedParticipantKeys,
+        ),
+      };
+    });
+  },
+
+  updateParticipantOverall(participantName, rating) {
+    applyAndPersist(get, set, (state) => {
+      const key = historyKey(participantName);
+      if (!key) {
+        return {
+          tournaments: state.tournaments,
+          participantHistory: state.participantHistory,
+          deletedParticipantKeys: state.deletedParticipantKeys,
+          currentTournamentId: state.currentTournamentId,
+        };
+      }
+      const nextRating = clampRating(rating);
+      const tournaments = state.tournaments.map((tournament) => ({
+        ...tournament,
+        participants: tournament.participants.map((participant) =>
+          historyKey(participant.name) === key
+            ? { ...participant, rating: nextRating }
+            : participant,
+        ),
+      }));
       return {
         tournaments,
         currentTournamentId: state.currentTournamentId,

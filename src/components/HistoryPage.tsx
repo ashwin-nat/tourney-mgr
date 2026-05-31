@@ -22,6 +22,7 @@ type Props = {
   onExportStats: () => StatsTransferFile;
   onImportStats: (input: unknown) => { ok: true } | { ok: false; error: string };
   onDeleteParticipantHistory: (participantName: string) => void;
+  onUpdateParticipantOverall: (participantName: string, rating: number) => void;
 };
 
 function pct(value: number): string {
@@ -227,6 +228,20 @@ function getTournamentTitleStreaks(
   return { current, max };
 }
 
+function getParticipantOverall(
+  tournaments: Tournament[],
+  participantName: string,
+): number {
+  const participantKey = participantName.trim().toLowerCase();
+  for (const tournament of tournamentsByRecency(tournaments)) {
+    const participant = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === participantKey,
+    );
+    if (participant) return participant.rating;
+  }
+  return 50;
+}
+
 function renderRecentResults(results: RecentResult[]): ReactNode {
   if (!results.length) {
     return <span className="recentEmpty">-</span>;
@@ -265,12 +280,14 @@ export function HistoryPage({
   onExportStats,
   onImportStats,
   onDeleteParticipantHistory,
+  onUpdateParticipantOverall,
 }: Props) {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importMessage, setImportMessage] = useState<string>("");
   const [selectedParticipantKey, setSelectedParticipantKey] = useState<string | null>(
     null,
   );
+  const [overallDraft, setOverallDraft] = useState<number>(50);
   const participants = Object.values(participantHistory).sort((a, b) => {
     if (b.elo !== a.elo) return b.elo - a.elo;
     if (b.wins !== a.wins) return b.wins - a.wins;
@@ -283,6 +300,13 @@ export function HistoryPage({
         (entry) => entry.name.trim().toLowerCase() === selectedParticipantKey,
       ) ?? null,
     [participants, selectedParticipantKey],
+  );
+  const selectedParticipantOverall = useMemo(
+    () =>
+      selectedParticipant
+        ? getParticipantOverall(tournaments, selectedParticipant.name)
+        : null,
+    [selectedParticipant, tournaments],
   );
   const selectedOpponents = useMemo(
     () =>
@@ -417,6 +441,11 @@ export function HistoryPage({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedParticipant]);
+
+  useEffect(() => {
+    if (selectedParticipantOverall === null) return;
+    setOverallDraft(selectedParticipantOverall);
+  }, [selectedParticipantOverall]);
 
   const completed = tournaments.filter((tournament) => tournament.status === "COMPLETED").length;
   const totalMatches = tournaments.reduce(
@@ -809,6 +838,25 @@ export function HistoryPage({
           >
             <div className="row modalHeader">
               <h3>{selectedParticipant.name} Detailed Stats</h3>
+              <label>
+                Overall
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={overallDraft}
+                  onChange={(event) => setOverallDraft(Number(event.target.value))}
+                />
+              </label>
+              <button
+                onClick={() => onUpdateParticipantOverall(selectedParticipant.name, overallDraft)}
+                disabled={
+                  selectedParticipantOverall === null ||
+                  overallDraft === selectedParticipantOverall
+                }
+              >
+                Save Overall
+              </button>
               <button
                 className="danger"
                 onClick={() => {
