@@ -56,11 +56,16 @@ function buildSingleEliminationRound(
 
   const matches: Match[] = [];
   for (let i = 0; i < ids.length; i += 2) {
+    const playerA = ids[i];
+    const playerB = ids[i + 1];
+    if (playerA === BYE_ID && playerB === BYE_ID) continue;
+    const byeWinner = playerA === BYE_ID ? playerB : playerB === BYE_ID ? playerA : undefined;
     matches.push({
       id: makeId("match"),
-      playerA: ids[i],
-      playerB: ids[i + 1],
-      played: false,
+      playerA,
+      playerB,
+      played: byeWinner !== undefined,
+      winner: byeWinner,
       round,
       stage: "KNOCKOUT",
     });
@@ -305,11 +310,15 @@ function maybeGenerateNextSingleEliminationRound(tournament: Tournament): Tourna
 
   const nextMatches: Match[] = [];
   for (let i = 0; i < winners.length; i += 2) {
+    const playerA = winners[i];
+    const playerB = winners[i + 1] ?? BYE_ID;
+    const byeWinner = playerB === BYE_ID ? playerA : undefined;
     nextMatches.push({
       id: makeId("match"),
-      playerA: winners[i],
-      playerB: winners[i + 1] ?? BYE_ID,
-      played: false,
+      playerA,
+      playerB,
+      played: byeWinner !== undefined,
+      winner: byeWinner,
       round: maxRound + 1,
       stage: "KNOCKOUT",
     });
