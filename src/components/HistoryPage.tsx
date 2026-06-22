@@ -62,10 +62,9 @@ type FormatStatsRow = {
   finals: number;
   winRate: number;
   finalConversionRate: number;
-  groupWinRate: number;
+  groupLeagueWinRate: number;
   knockoutWinRate: number;
   swissWinRate: number;
-  leagueWinRate: number;
 };
 
 function emptyStageBucket(): StageBucket {
@@ -420,15 +419,31 @@ export function HistoryPage({
         finals: stats.finals,
         winRate: winRate(stats.wins, stats.played),
         finalConversionRate: winRate(stats.championships, stats.finals),
-        groupWinRate: winRate(stats.stageStats.group.wins, stats.stageStats.group.played),
+        groupLeagueWinRate: winRate(
+          stats.stageStats.group.wins + stats.stageStats.league.wins,
+          stats.stageStats.group.played + stats.stageStats.league.played,
+        ),
         knockoutWinRate: winRate(
           stats.stageStats.knockout.wins,
           stats.stageStats.knockout.played,
         ),
         swissWinRate: winRate(stats.stageStats.swiss.wins, stats.stageStats.swiss.played),
-        leagueWinRate: winRate(stats.stageStats.league.wins, stats.stageStats.league.played),
       }))
       .sort((a, b) => a.format.localeCompare(b.format));
+  }, [selectedParticipant, tournaments]);
+
+  const lastTitleInfo = useMemo(() => {
+    if (!selectedParticipant) return null;
+    const won = tournaments
+      .filter((t) => t.status === "COMPLETED" && getTournamentChampionName(t) === selectedParticipant.name)
+      .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+    if (!won.length) return null;
+    const latest = won[0];
+    const runnerUpId = getTournamentRunnerUpId(latest);
+    const runnerUpName = runnerUpId
+      ? (latest.participants.find((p) => p.id === runnerUpId)?.name ?? null)
+      : null;
+    return { tournamentName: latest.name, opponent: runnerUpName };
   }, [selectedParticipant, tournaments]);
 
   useEffect(() => {
@@ -483,7 +498,10 @@ export function HistoryPage({
       bestTitleStreak: titleStreaks.max,
       finalConversionRate: winRate(entry.championships, entry.finals),
       winRate: winRate(entry.wins, entry.played),
-      groupWinRate: winRate(entry.stageStats.group.wins, entry.stageStats.group.played),
+      groupLeagueWinRate: winRate(
+        entry.stageStats.group.wins + entry.stageStats.league.wins,
+        entry.stageStats.group.played + entry.stageStats.league.played,
+      ),
       knockoutWinRate: winRate(
         entry.stageStats.knockout.wins,
         entry.stageStats.knockout.played,
@@ -592,8 +610,8 @@ export function HistoryPage({
       },
       { header: "Win%", accessorKey: "winRate", cell: (ctx) => pct(ctx.getValue<number>()) },
       {
-        header: "Group Win%",
-        accessorKey: "groupWinRate",
+        header: "Group/League Win%",
+        accessorKey: "groupLeagueWinRate",
         cell: (ctx) => pct(ctx.getValue<number>()),
       },
       {
@@ -702,8 +720,8 @@ export function HistoryPage({
       },
       { header: "Win%", accessorKey: "winRate", cell: (ctx) => pct(ctx.getValue<number>()) },
       {
-        header: "Group Win%",
-        accessorKey: "groupWinRate",
+        header: "Group/League Win%",
+        accessorKey: "groupLeagueWinRate",
         cell: (ctx) => pct(ctx.getValue<number>()),
       },
       {
@@ -714,11 +732,6 @@ export function HistoryPage({
       {
         header: "Swiss Win%",
         accessorKey: "swissWinRate",
-        cell: (ctx) => pct(ctx.getValue<number>()),
-      },
-      {
-        header: "League Win%",
-        accessorKey: "leagueWinRate",
         cell: (ctx) => pct(ctx.getValue<number>()),
       },
     ],
@@ -912,6 +925,14 @@ export function HistoryPage({
                 <small>Championships</small>
               </article>
               <article className="miniCard">
+                <strong>
+                  {lastTitleInfo
+                    ? `${lastTitleInfo.tournamentName}${lastTitleInfo.opponent ? ` vs ${lastTitleInfo.opponent}` : ""}`
+                    : "—"}
+                </strong>
+                <small>Last Title</small>
+              </article>
+              <article className="miniCard">
                 <strong>{selectedParticipant.runnerUps}</strong>
                 <small>Runner-ups</small>
               </article>
@@ -931,12 +952,12 @@ export function HistoryPage({
                 <strong>
                   {pct(
                     winRate(
-                      selectedParticipant.stageStats.group.wins,
-                      selectedParticipant.stageStats.group.played,
+                      selectedParticipant.stageStats.group.wins + selectedParticipant.stageStats.league.wins,
+                      selectedParticipant.stageStats.group.played + selectedParticipant.stageStats.league.played,
                     ),
                   )}
                 </strong>
-                <small>Group Stage Win Rate</small>
+                <small>Group/League Win Rate</small>
               </article>
               <article className="miniCard">
                 <strong>
@@ -959,17 +980,6 @@ export function HistoryPage({
                   )}
                 </strong>
                 <small>Swiss Win Rate</small>
-              </article>
-              <article className="miniCard">
-                <strong>
-                  {pct(
-                    winRate(
-                      selectedParticipant.stageStats.league.wins,
-                      selectedParticipant.stageStats.league.played,
-                    ),
-                  )}
-                </strong>
-                <small>League Win Rate</small>
               </article>
             </div>
             <h4>Head-to-head</h4>
