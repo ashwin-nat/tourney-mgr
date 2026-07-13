@@ -16,6 +16,7 @@ import { maybeGenerateSwissRound } from "../formats/swiss";
 import { StorageService } from "../storage";
 import {
   SCHEMA_VERSION,
+  TBD_ID,
   type MatchStage,
   type Match,
   type NewTournamentInput,
@@ -28,6 +29,7 @@ import { makeId } from "../utils/id";
 import {
   getStageManualEditContext,
   isGroupRoundEditAllowed,
+  isKnockoutMatchEditable,
   isManualRoundEditAllowed,
 } from "../utils/manualResultRules";
 import { getTournamentChampionId, getTournamentRunnerUpId } from "../utils/champion";
@@ -368,6 +370,11 @@ function runFormatProgression(tournament: Tournament): Tournament {
   return next;
 }
 
+/** A match can be simulated only once both of its slots hold real participants. */
+function isPlayable(match: Match): boolean {
+  return !match.played && match.playerA !== TBD_ID && match.playerB !== TBD_ID;
+}
+
 function applyMatchSimulation(
   tournament: Tournament,
   matchIds: string[],
@@ -388,8 +395,23 @@ function applyManualMatchResult(
 ): Tournament {
   const targetMatch = tournament.matches.find((match) => match.id === matchId);
   if (!targetMatch) return tournament;
+
+  // Knockout results flow through the fixed bracket tree: record (or re-roll)
+  // the result in place and let resolveKnockoutBracket propagate it. Future
+  // rounds are never deleted or re-paired.
+  if (targetMatch.stage === "KNOCKOUT") {
+    if (!isKnockoutMatchEditable(targetMatch)) return tournament;
+    const matches = tournament.matches.map((match) => {
+      if (match.id !== matchId) return match;
+      const winner =
+        winnerId === match.playerA || winnerId === match.playerB ? winnerId : undefined;
+      return { ...match, winner, played: true };
+    });
+    return runFormatProgression({ ...tournament, matches, status: "IN_PROGRESS" });
+  }
+
   let shouldRebuildFutureRounds = false;
-  if (targetMatch.stage === "KNOCKOUT" || targetMatch.stage === "SWISS") {
+  if (targetMatch.stage === "SWISS") {
     const stageMatches = tournament.matches.filter(
       (match) => match.stage === targetMatch.stage,
     );
@@ -758,7 +780,7 @@ export const useTournamentStore = create<Store>((set, get) => ({
       const tournaments = state.tournaments.map((t) => {
         if (t.id !== id) return t;
         const matchIds = t.matches
-          .filter((m) => !m.played && m.round === round)
+          .filter((m) => isPlayable(m) && m.round === round)
           .map((m) => m.id);
         return applyMatchSimulation(t, matchIds, state.participantHistory);
       });
@@ -786,14 +808,14 @@ export const useTournamentStore = create<Store>((set, get) => ({
 
         for (let guard = 0; guard < 1000; guard += 1) {
           const nextUnplayedInTargetStage = current.matches.find(
-            (match) => !match.played && match.stage === targetStage,
+            (match) => isPlayable(match) && match.stage === targetStage,
           );
           if (!nextUnplayedInTargetStage) break;
           const currentRound = nextUnplayedInTargetStage.round;
           const roundIds = current.matches
             .filter(
               (match) =>
-                !match.played &&
+                isPlayable(match) &&
                 match.stage === targetStage &&
                 match.round === currentRound,
             )
@@ -833,11 +855,11 @@ export const useTournamentStore = create<Store>((set, get) => ({
         let current = t;
         let history = state.participantHistory;
         for (let guard = 0; guard < 1000; guard += 1) {
-          const nextUnplayed = current.matches.find((m) => !m.played);
+          const nextUnplayed = current.matches.find((m) => isPlayable(m));
           if (!nextUnplayed) break;
           const currentRound = nextUnplayed.round;
           const roundIds = current.matches
-            .filter((m) => !m.played && m.round === currentRound)
+            .filter((m) => isPlayable(m) && m.round === currentRound)
             .map((m) => m.id);
           current = applyMatchSimulation(current, roundIds, history);
           const tournamentsWithCurrent = [...state.tournaments];

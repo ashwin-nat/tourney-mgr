@@ -1,4 +1,18 @@
-import type { Match } from "../types";
+import { BYE_ID, TBD_ID, type Match } from "../types";
+
+/**
+ * A knockout match in the fixed bracket can be recorded or re-rolled whenever
+ * both of its slots hold real participants. Unresolved (TBD) or BYE slots are
+ * not editable; results propagate through the tree automatically.
+ */
+export function isKnockoutMatchEditable(match: Match): boolean {
+  return (
+    match.playerA !== BYE_ID &&
+    match.playerA !== TBD_ID &&
+    match.playerB !== BYE_ID &&
+    match.playerB !== TBD_ID
+  );
+}
 
 type ManualEditContext = {
   allowedRound: number;

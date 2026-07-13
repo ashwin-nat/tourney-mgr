@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Tournament } from "../src/types";
+import { buildSingleEliminationTree } from "../src/formats/knockout";
+import { TBD_ID, type Match, type Tournament } from "../src/types";
 
 vi.mock("../src/storage", () => ({
   StorageService: {
@@ -15,82 +16,24 @@ vi.mock("../src/storage", () => ({
 
 import { useTournamentStore } from "../src/store/tournamentStore";
 
-function baseTournament(): Tournament {
-  return {
+function singleElimTournament(): { tournament: Tournament; matches: Match[] } {
+  const matches = buildSingleEliminationTree(["a", "b", "c", "d"], 1, 42).matches;
+  const tournament: Tournament = {
     id: "t1",
-    name: "double elimination",
+    name: "single elimination",
     format: "KNOCKOUT",
     participants: [
-      { id: "u", name: "Undefeated", rating: 50 },
       { id: "a", name: "A", rating: 50 },
       { id: "b", name: "B", rating: 50 },
       { id: "c", name: "C", rating: 50 },
+      { id: "d", name: "D", rating: 50 },
     ],
-    matches: [
-      {
-        id: "m1",
-        playerA: "u",
-        playerB: "a",
-        played: true,
-        winner: "u",
-        round: 1,
-        stage: "KNOCKOUT",
-        knockoutBracket: "UPPER",
-      },
-      {
-        id: "m2",
-        playerA: "b",
-        playerB: "c",
-        played: true,
-        winner: "b",
-        round: 1,
-        stage: "KNOCKOUT",
-        knockoutBracket: "UPPER",
-      },
-      {
-        id: "m3",
-        playerA: "u",
-        playerB: "b",
-        played: true,
-        winner: "u",
-        round: 2,
-        stage: "KNOCKOUT",
-        knockoutBracket: "UPPER",
-      },
-      {
-        id: "m4",
-        playerA: "a",
-        playerB: "c",
-        played: true,
-        winner: "a",
-        round: 2,
-        stage: "KNOCKOUT",
-        knockoutBracket: "LOWER",
-      },
-      {
-        id: "m5",
-        playerA: "a",
-        playerB: "b",
-        played: true,
-        winner: "a",
-        round: 3,
-        stage: "KNOCKOUT",
-        knockoutBracket: "LOWER",
-      },
-      {
-        id: "m6",
-        playerA: "u",
-        playerB: "a",
-        played: false,
-        round: 4,
-        stage: "KNOCKOUT",
-        knockoutBracket: "GRAND_FINAL",
-      },
-    ],
-    settings: { doubleElimination: true },
+    matches,
+    settings: {},
     status: "IN_PROGRESS",
-    schemaVersion: 1,
+    schemaVersion: 2,
   };
+  return { tournament, matches };
 }
 
 describe("manual knockout corrections", () => {
@@ -103,29 +46,61 @@ describe("manual knockout corrections", () => {
     });
   });
 
-  it("rebuilds grand final participants when lower final winner is corrected", () => {
-    const tournament = baseTournament();
+  it("propagates results through the fixed tree and re-rolls without re-pairing", () => {
+    const { tournament, matches } = singleElimTournament();
+    const [m1, m2] = matches.filter((m) => m.round === 1);
+    const finalId = matches.find((m) => m.round === 2)!.id;
+
     useTournamentStore.setState({
       tournaments: [tournament],
       currentTournamentId: tournament.id,
       participantHistory: {},
     });
 
-    useTournamentStore.getState().setMatchResult(tournament.id, "m5", "b");
+    const store = useTournamentStore.getState();
+    const get = () =>
+      useTournamentStore
+        .getState()
+        .tournaments.find((item) => item.id === tournament.id)!;
 
-    const updated = useTournamentStore
+    // Play both round-1 matches: the final fills with the winners.
+    store.setMatchResult(tournament.id, m1.id, m1.playerA);
+    store.setMatchResult(tournament.id, m2.id, m2.playerA);
+
+    const finalBefore = get().matches.find((m) => m.id === finalId)!;
+    expect(finalBefore.playerA).toBe(m1.playerA);
+    expect(finalBefore.playerB).toBe(m2.playerA);
+
+    // Record the final, then re-roll the first round-1 match.
+    store.setMatchResult(tournament.id, finalId, m1.playerA);
+    store.setMatchResult(tournament.id, m1.id, m1.playerB);
+
+    const finalAfter = get().matches.find((m) => m.id === finalId)!;
+    // Structure stays fixed; only the occupant flowing in changes.
+    expect(finalAfter.sourceA).toEqual(finalBefore.sourceA);
+    expect(finalAfter.playerA).toBe(m1.playerB);
+    expect(finalAfter.playerB).toBe(m2.playerA);
+    // The now-impossible final result is invalidated.
+    expect(finalAfter.played).toBe(false);
+    expect(finalAfter.winner).toBeUndefined();
+  });
+
+  it("ignores results for matches whose slots are not yet resolved", () => {
+    const { tournament, matches } = singleElimTournament();
+    const finalId = matches.find((m) => m.round === 2)!.id;
+
+    useTournamentStore.setState({
+      tournaments: [tournament],
+      currentTournamentId: tournament.id,
+      participantHistory: {},
+    });
+
+    // The final still has TBD slots, so a manual result is rejected.
+    useTournamentStore.getState().setMatchResult(tournament.id, finalId, TBD_ID);
+    const final = useTournamentStore
       .getState()
-      .tournaments.find((item) => item.id === tournament.id);
-    expect(updated).toBeDefined();
-
-    const correctedLowerFinal = updated!.matches.find((match) => match.id === "m5");
-    expect(correctedLowerFinal?.winner).toBe("b");
-
-    const grandFinals = updated!.matches.filter(
-      (match) => match.knockoutBracket === "GRAND_FINAL",
-    );
-    expect(grandFinals).toHaveLength(1);
-    expect(grandFinals[0].played).toBe(false);
-    expect([grandFinals[0].playerA, grandFinals[0].playerB].sort()).toEqual(["b", "u"]);
+      .tournaments.find((item) => item.id === tournament.id)!
+      .matches.find((m) => m.id === finalId)!;
+    expect(final.played).toBe(false);
   });
 });

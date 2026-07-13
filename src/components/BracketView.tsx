@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BYE_ID, type Match, type Tournament } from "../types";
+import { BYE_ID, TBD_ID, type Match, type Tournament } from "../types";
 import {
   getStageManualEditContext,
   isGroupRoundEditAllowed,
+  isKnockoutMatchEditable,
   isManualRoundEditAllowed,
 } from "../utils/manualResultRules";
 import { getTournamentChampionName } from "../utils/champion";
@@ -23,6 +24,7 @@ type BracketLine = {
 
 function participantName(tournament: Tournament, id: string): string {
   if (id === BYE_ID) return "BYE";
+  if (id === TBD_ID) return "TBD";
   return tournament.participants.find((p) => p.id === id)?.name ?? "Unknown";
 }
 
@@ -283,8 +285,10 @@ export function BracketView({
                   const highlightMatch =
                     !!playAsParticipantId &&
                     (m.playerA === playAsParticipantId || m.playerB === playAsParticipantId);
+                  const slotPending = m.playerA === TBD_ID || m.playerB === TBD_ID;
                   const manualResultDisabled =
-                    ((m.stage === "KNOCKOUT" || m.stage === "SWISS") && !isManualRoundEditAllowed(stageMatches, m.round)) ||
+                    (m.stage === "KNOCKOUT" && !isKnockoutMatchEditable(m)) ||
+                    (m.stage === "SWISS" && !isManualRoundEditAllowed(stageMatches, m.round)) ||
                     (m.stage === "GROUP" &&
                       !isGroupRoundEditAllowed(stageMatches, knockoutMatches, m.round));
                   const manualResultReason =
@@ -294,11 +298,13 @@ export function BracketView({
                         : knockoutExists
                           ? "Only the last group round can be edited before knockout starts."
                           : "Manual recording is allowed for group-stage matches."
-                      : manualResultDisabled
-                        ? currentRoundStarted
-                          ? "Manual recording is only allowed for the active round in this stage."
-                          : `Manual recording is allowed for round ${allowedRound} and round ${Math.max(1, allowedRound - 1)} until this round starts.`
-                        : undefined;
+                      : m.stage === "KNOCKOUT" && manualResultDisabled
+                        ? "Waiting on earlier matches to fill this slot."
+                        : manualResultDisabled
+                          ? currentRoundStarted
+                            ? "Manual recording is only allowed for the active round in this stage."
+                            : `Manual recording is allowed for round ${allowedRound} and round ${Math.max(1, allowedRound - 1)} until this round starts.`
+                          : undefined;
 
                   return (
                     <div
@@ -348,8 +354,14 @@ export function BracketView({
                         </div>
                         <button
                           className="simButton"
-                          disabled={m.played}
-                          title={m.played ? "Match already has a result." : undefined}
+                          disabled={m.played || slotPending}
+                          title={
+                            m.played
+                              ? "Match already has a result."
+                              : slotPending
+                                ? "Waiting on earlier matches to fill this slot."
+                                : undefined
+                          }
                           onClick={() => onSimulateMatch(m.id)}
                         >
                           {"\uD83C\uDFB2"} Sim

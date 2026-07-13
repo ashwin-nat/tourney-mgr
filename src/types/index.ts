@@ -1,5 +1,6 @@
 export const BYE_ID = "BYE";
-export const SCHEMA_VERSION = 1;
+export const TBD_ID = "TBD";
+export const SCHEMA_VERSION = 2;
 
 export type TournamentFormat = "GROUP_KO" | "KNOCKOUT" | "SWISS" | "LEAGUE";
 export type TournamentStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
@@ -63,6 +64,8 @@ export type Standing = {
   buchholz?: number;
 };
 
+export type SlotSource = { fromMatchId: string; take: "WINNER" | "LOSER" };
+
 export type Match = {
   id: string;
   playerA: string;
@@ -73,6 +76,8 @@ export type Match = {
   stage: MatchStage;
   groupId?: string;
   knockoutBracket?: "UPPER" | "LOWER" | "GRAND_FINAL";
+  sourceA?: SlotSource;
+  sourceB?: SlotSource;
 };
 
 export type Group = {

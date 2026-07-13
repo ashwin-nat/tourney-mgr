@@ -1,9 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { winProbability, simulateMatchResult } from "../src/engine/simulation";
-import { maybeGenerateNextKnockoutRound } from "../src/formats/knockout";
+import {
+  buildDoubleEliminationTree,
+  buildSingleEliminationTree,
+  resolveKnockoutBracket,
+} from "../src/formats/knockout";
 import { maybeStartKnockoutAfterGroups } from "../src/formats/groups";
 import { maybeGenerateSwissRound } from "../src/formats/swiss";
-import type { Tournament } from "../src/types";
+import { TBD_ID, type Match, type Tournament } from "../src/types";
+
+function knockoutTournament(matches: Match[]): Tournament {
+  return {
+    id: "ko",
+    name: "ko",
+    format: "KNOCKOUT",
+    participants: [],
+    matches,
+    settings: { doubleElimination: matches.some((m) => m.knockoutBracket) },
+    status: "IN_PROGRESS",
+    schemaVersion: 2,
+  };
+}
+
+function recordResult(tournament: Tournament, matchId: string, winnerId: string): Tournament {
+  const matches = tournament.matches.map((match) =>
+    match.id === matchId ? { ...match, played: true, winner: winnerId } : match,
+  );
+  return resolveKnockoutBracket({ ...tournament, matches });
+}
 
 describe("simulation", () => {
   it("higher rating should have higher win probability", () => {
@@ -51,135 +75,62 @@ describe("simulation", () => {
   });
 });
 
-describe("knockout progression", () => {
-  it("creates next round from completed round winners", () => {
-    const tournament: Tournament = {
-      id: "t2",
-      name: "ko",
-      format: "KNOCKOUT",
-      participants: [],
-      matches: [
-        {
-          id: "m1",
-          playerA: "a",
-          playerB: "b",
-          played: true,
-          winner: "a",
-          round: 1,
-          stage: "KNOCKOUT",
-        },
-        {
-          id: "m2",
-          playerA: "c",
-          playerB: "d",
-          played: true,
-          winner: "c",
-          round: 1,
-          stage: "KNOCKOUT",
-        },
-      ],
-      settings: {},
-      status: "IN_PROGRESS",
-      schemaVersion: 1,
-    };
-    const next = maybeGenerateNextKnockoutRound(tournament);
-    const round2 = next.matches.filter((m) => m.round === 2);
+describe("knockout fixed bracket", () => {
+  it("builds the full single-elimination tree up front with locked pairings", () => {
+    const { matches } = buildSingleEliminationTree(["a", "b", "c", "d"], 1, 42);
+    const round1 = matches.filter((m) => m.round === 1);
+    const round2 = matches.filter((m) => m.round === 2);
+
+    expect(round1).toHaveLength(2);
     expect(round2).toHaveLength(1);
-    expect(round2[0].playerA).toBe("a");
-    expect(round2[0].playerB).toBe("c");
+    // The final exists before any result and references the round-1 winners.
+    expect(round2[0].playerA).toBe(TBD_ID);
+    expect(round2[0].playerB).toBe(TBD_ID);
+    expect(round2[0].sourceA).toEqual({ fromMatchId: round1[0].id, take: "WINNER" });
+    expect(round2[0].sourceB).toEqual({ fromMatchId: round1[1].id, take: "WINNER" });
   });
 
-  it("routes upper-bracket losers into lower bracket in double elimination", () => {
-    const tournament: Tournament = {
-      id: "t3",
-      name: "double",
-      format: "KNOCKOUT",
-      participants: [],
-      matches: [
-        {
-          id: "m1",
-          playerA: "a",
-          playerB: "b",
-          played: true,
-          winner: "a",
-          round: 1,
-          stage: "KNOCKOUT",
-          knockoutBracket: "UPPER",
-        },
-        {
-          id: "m2",
-          playerA: "c",
-          playerB: "d",
-          played: true,
-          winner: "c",
-          round: 1,
-          stage: "KNOCKOUT",
-          knockoutBracket: "UPPER",
-        },
-      ],
-      settings: { doubleElimination: true },
-      status: "IN_PROGRESS",
-      schemaVersion: 1,
-    };
+  it("enforces winner-of-m1 vs winner-of-m2 and keeps pairings fixed across a reroll", () => {
+    const { matches } = buildSingleEliminationTree(["a", "b", "c", "d"], 1, 42);
+    const [m1, m2] = matches.filter((m) => m.round === 1);
+    const finalId = matches.find((m) => m.round === 2)!.id;
 
-    const next = maybeGenerateNextKnockoutRound(tournament);
-    const upperRound2 = next.matches.filter(
-      (match) => match.round === 2 && match.knockoutBracket === "UPPER",
-    );
-    const lowerRound2 = next.matches.filter(
-      (match) => match.round === 2 && match.knockoutBracket === "LOWER",
-    );
+    let tournament = recordResult(knockoutTournament(matches), m1.id, m1.playerA);
+    tournament = recordResult(tournament, m2.id, m2.playerA);
+    const finalBefore = tournament.matches.find((m) => m.id === finalId)!;
+    expect(finalBefore.playerA).toBe(m1.playerA);
+    expect(finalBefore.playerB).toBe(m2.playerA);
 
-    expect(upperRound2).toHaveLength(1);
-    expect(lowerRound2).toHaveLength(1);
-    expect([upperRound2[0].playerA, upperRound2[0].playerB].sort()).toEqual(["a", "c"]);
-    expect([lowerRound2[0].playerA, lowerRound2[0].playerB].sort()).toEqual(["b", "d"]);
+    // Record the final, then reroll the first round-1 match.
+    tournament = recordResult(tournament, finalId, m1.playerA);
+    const rerolled = recordResult(tournament, m1.id, m1.playerB);
+    const finalAfter = rerolled.matches.find((m) => m.id === finalId)!;
+
+    // Pairing graph is unchanged; only the occupant and the now-stale result move.
+    expect(finalAfter.sourceA).toEqual(finalBefore.sourceA);
+    expect(finalAfter.sourceB).toEqual(finalBefore.sourceB);
+    expect(finalAfter.playerA).toBe(m1.playerB);
+    expect(finalAfter.played).toBe(false);
+    expect(finalAfter.winner).toBeUndefined();
   });
 
-  it("keeps lower-bracket qualifiers in lower bracket after a win", () => {
-    const tournament: Tournament = {
-      id: "t4",
-      name: "group-seeded-double",
-      format: "GROUP_KO",
-      participants: [],
-      matches: [
-        {
-          id: "m1",
-          playerA: "a",
-          playerB: "c",
-          played: true,
-          winner: "a",
-          round: 2,
-          stage: "KNOCKOUT",
-          knockoutBracket: "UPPER",
-        },
-        {
-          id: "m2",
-          playerA: "b",
-          playerB: "d",
-          played: true,
-          winner: "b",
-          round: 2,
-          stage: "KNOCKOUT",
-          knockoutBracket: "LOWER",
-        },
-      ],
-      settings: { doubleElimination: true },
-      status: "IN_PROGRESS",
-      schemaVersion: 1,
-    };
+  it("drops upper-bracket losers into fixed lower-bracket slots", () => {
+    const matches = buildDoubleEliminationTree(["a", "b", "c", "d"], [], 1, 42);
+    const upper = matches.filter((m) => m.knockoutBracket === "UPPER");
+    const lower = matches.filter((m) => m.knockoutBracket === "LOWER");
+    const grandFinal = matches.filter((m) => m.knockoutBracket === "GRAND_FINAL");
 
-    const next = maybeGenerateNextKnockoutRound(tournament);
-    const upperRound3 = next.matches.filter(
-      (match) => match.round === 3 && match.knockoutBracket === "UPPER",
-    );
-    const lowerRound3 = next.matches.filter(
-      (match) => match.round === 3 && match.knockoutBracket === "LOWER",
-    );
-
-    expect(upperRound3).toHaveLength(0);
-    expect(lowerRound3).toHaveLength(1);
-    expect([lowerRound3[0].playerA, lowerRound3[0].playerB].sort()).toEqual(["b", "c"]);
+    expect(upper).toHaveLength(3); // 2 + 1
+    expect(grandFinal).toHaveLength(1);
+    // At least one lower-bracket slot is fed by an upper-bracket loser.
+    expect(
+      lower.some(
+        (m) => m.sourceA?.take === "LOSER" || m.sourceB?.take === "LOSER",
+      ),
+    ).toBe(true);
+    // Grand final pairs the two bracket winners.
+    expect(grandFinal[0].sourceA?.take).toBe("WINNER");
+    expect(grandFinal[0].sourceB?.take).toBe("WINNER");
   });
 });
 
@@ -230,10 +181,16 @@ describe("group to knockout seeding", () => {
     const upper = next.matches.filter((match) => match.knockoutBracket === "UPPER");
     const lower = next.matches.filter((match) => match.knockoutBracket === "LOWER");
 
-    expect(upper).toHaveLength(1);
-    expect(lower).toHaveLength(1);
-    expect([upper[0].playerA, upper[0].playerB].sort()).toEqual(["a", "c"]);
-    expect([lower[0].playerA, lower[0].playerB].sort()).toEqual(["b", "d"]);
+    // Top-half qualifiers seed the upper bracket, bottom-half seed the lower
+    // bracket as a fixed tree built up front.
+    const seededUpper = upper.find((m) => !m.sourceA && !m.sourceB)!;
+    const seededLower = lower.find((m) => !m.sourceA && !m.sourceB)!;
+    expect([seededUpper.playerA, seededUpper.playerB].sort()).toEqual(["a", "c"]);
+    expect([seededLower.playerA, seededLower.playerB].sort()).toEqual(["b", "d"]);
+    // A grand final exists in the bracket from the start.
+    expect(
+      next.matches.filter((m) => m.knockoutBracket === "GRAND_FINAL"),
+    ).toHaveLength(1);
   });
 });
 
