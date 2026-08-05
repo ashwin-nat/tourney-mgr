@@ -183,6 +183,58 @@ function getRecentResultsVsOpponent(
   return recent.reverse();
 }
 
+function getCurrentStreakVsOpponent(
+  tournaments: Tournament[],
+  participantName: string,
+  opponentName: string,
+): number {
+  const participantKey = participantName.trim().toLowerCase();
+  const opponentKey = opponentName.trim().toLowerCase();
+  let streak = 0;
+  let started = false;
+
+  for (const tournament of tournamentsByRecency(tournaments)) {
+    const participant = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === participantKey,
+    );
+    const opponent = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === opponentKey,
+    );
+    if (!participant || !opponent) continue;
+
+    const matches = tournament.matches
+      .filter(
+        (match) =>
+          match.played &&
+          ((match.playerA === participant.id && match.playerB === opponent.id) ||
+            (match.playerA === opponent.id && match.playerB === participant.id)),
+      )
+      .sort((a, b) => b.round - a.round);
+
+    for (const match of matches) {
+      const outcome = matchOutcomeForParticipant(match.winner, participant.id);
+      if (!started) {
+        started = true;
+        if (outcome === "D") return 0;
+        streak = outcome === "W" ? 1 : -1;
+        continue;
+      }
+      if (outcome === "D") return streak;
+      if (outcome === "W" && streak > 0) {
+        streak += 1;
+        continue;
+      }
+      if (outcome === "L" && streak < 0) {
+        streak -= 1;
+        continue;
+      }
+      return streak;
+    }
+  }
+
+  return streak;
+}
+
 function getTournamentTitleStreaks(
   tournaments: Tournament[],
   participantName: string,
@@ -675,6 +727,9 @@ export function HistoryPage({
           )
         : [],
     winRate: opponent.played ? (opponent.wins / opponent.played) * 100 : 0,
+    currentStreak: selectedParticipant
+      ? getCurrentStreakVsOpponent(tournaments, selectedParticipant.name, opponent.opponentName)
+      : 0,
   }));
   const opponentColumns = useMemo<ColumnDef<(typeof opponentRows)[number]>[]>(
     () => [
@@ -683,6 +738,20 @@ export function HistoryPage({
       { header: "W", accessorKey: "wins" },
       { header: "L", accessorKey: "losses" },
       { header: "D", accessorKey: "draws" },
+      {
+        header: "Current Streak",
+        accessorKey: "currentStreak",
+        cell: (ctx) => {
+          const streak = ctx.getValue<number>();
+          const className =
+            streak > 0
+              ? "streakValue streakPositive"
+              : streak < 0
+                ? "streakValue streakNegative"
+                : "streakValue";
+          return <span className={className}>{streak > 0 ? `+${streak}` : streak}</span>;
+        },
+      },
       {
         header: "Recent (L5)",
         accessorKey: "recent",
