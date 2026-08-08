@@ -50,6 +50,10 @@ type Store = {
     rating: number,
   ) => void;
   updateParticipantOverall: (participantName: string, rating: number) => void;
+  renameParticipant: (
+    oldName: string,
+    newName: string,
+  ) => { ok: true } | { ok: false; error: string };
   exportStats: () => StatsTransferFile;
   importStats: (input: unknown) => { ok: true } | { ok: false; error: string };
   deleteParticipantFromHistory: (participantName: string) => void;
@@ -621,6 +625,57 @@ export const useTournamentStore = create<Store>((set, get) => ({
         ),
       };
     });
+  },
+
+  renameParticipant(oldName, rawNewName) {
+    const state = get();
+    const oldKey = historyKey(oldName);
+    if (!oldKey) {
+      return { ok: false, error: "Participant not found." };
+    }
+    const hasParticipant = state.tournaments.some((t) =>
+      t.participants.some((p) => historyKey(p.name) === oldKey),
+    );
+    if (!hasParticipant) {
+      return { ok: false, error: "Participant not found." };
+    }
+    const newName = rawNewName.trim();
+    if (!newName) {
+      return { ok: false, error: "Name cannot be empty." };
+    }
+    const newKey = historyKey(newName);
+    if (oldKey === newKey) {
+      return { ok: true };
+    }
+
+    for (const t of state.tournaments) {
+      const seenKeys = new Set<string>();
+      for (const p of t.participants) {
+        const key = historyKey(p.name) === oldKey ? newKey : historyKey(p.name);
+        if (seenKeys.has(key)) {
+          return {
+            ok: false,
+            error: `"${newName}" already exists in tournament "${t.name}".`,
+          };
+        }
+        seenKeys.add(key);
+      }
+    }
+
+    const tournaments = state.tournaments.map((t) => ({
+      ...t,
+      participants: t.participants.map((p) =>
+        historyKey(p.name) === oldKey ? { ...p, name: newName } : p,
+      ),
+    }));
+
+    applyAndPersist(get, set, (s) => ({
+      tournaments,
+      currentTournamentId: s.currentTournamentId,
+      deletedParticipantKeys: s.deletedParticipantKeys,
+      participantHistory: deriveHistoryFromTournaments(tournaments, s.deletedParticipantKeys),
+    }));
+    return { ok: true };
   },
 
   exportStats() {

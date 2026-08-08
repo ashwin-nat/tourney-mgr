@@ -23,6 +23,10 @@ type Props = {
   onImportStats: (input: unknown) => { ok: true } | { ok: false; error: string };
   onDeleteParticipantHistory: (participantName: string) => void;
   onUpdateParticipantOverall: (participantName: string, rating: number) => void;
+  onRenameParticipant: (
+    oldName: string,
+    newName: string,
+  ) => { ok: true } | { ok: false; error: string };
 };
 
 function pct(value: number): string {
@@ -332,6 +336,7 @@ export function HistoryPage({
   onImportStats,
   onDeleteParticipantHistory,
   onUpdateParticipantOverall,
+  onRenameParticipant,
 }: Props) {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [importMessage, setImportMessage] = useState<string>("");
@@ -339,6 +344,8 @@ export function HistoryPage({
     null,
   );
   const [overallDraft, setOverallDraft] = useState<number>(50);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [renameError, setRenameError] = useState<string | null>(null);
   const participants = Object.values(participantHistory).sort((a, b) => {
     if (b.elo !== a.elo) return b.elo - a.elo;
     if (b.wins !== a.wins) return b.wins - a.wins;
@@ -513,6 +520,11 @@ export function HistoryPage({
     if (selectedParticipantOverall === null) return;
     setOverallDraft(selectedParticipantOverall);
   }, [selectedParticipantOverall]);
+
+  useEffect(() => {
+    setRenameDraft(selectedParticipant?.name ?? "");
+    setRenameError(null);
+  }, [selectedParticipant]);
 
   const completed = tournaments.filter((tournament) => tournament.status === "COMPLETED").length;
   const totalMatches = tournaments.reduce(
@@ -921,6 +933,41 @@ export function HistoryPage({
             <div className="row modalHeader">
               <h3>{selectedParticipant.name} Detailed Stats</h3>
               <label>
+                Name
+                <input
+                  value={renameDraft}
+                  onChange={(event) => setRenameDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      const result = onRenameParticipant(selectedParticipant.name, renameDraft);
+                      if (result.ok) {
+                        setSelectedParticipantKey(renameDraft.trim().toLowerCase());
+                        setRenameError(null);
+                      } else {
+                        setRenameError(result.error);
+                      }
+                    }
+                  }}
+                />
+              </label>
+              <button
+                onClick={() => {
+                  const result = onRenameParticipant(selectedParticipant.name, renameDraft);
+                  if (result.ok) {
+                    setSelectedParticipantKey(renameDraft.trim().toLowerCase());
+                    setRenameError(null);
+                  } else {
+                    setRenameError(result.error);
+                  }
+                }}
+                disabled={
+                  !renameDraft.trim() ||
+                  renameDraft.trim().toLowerCase() === selectedParticipant.name.trim().toLowerCase()
+                }
+              >
+                Save Name
+              </button>
+              <label>
                 Overall
                 <input
                   type="number"
@@ -960,6 +1007,7 @@ export function HistoryPage({
                 Close
               </button>
             </div>
+            {renameError && <p className="errorText">{renameError}</p>}
             <div className="historySummary">
               <article className="miniCard">
                 <strong>{Math.round(selectedParticipant.elo)}</strong>

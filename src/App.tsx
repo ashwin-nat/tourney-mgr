@@ -30,6 +30,7 @@ export default function App() {
     resetTournament,
     clearAll,
     updateParticipantRating,
+    renameParticipant,
     hydrate,
     isHydrated,
   } = useTournamentStore();
@@ -153,6 +154,7 @@ export default function App() {
           onImportStats={importStats}
           onDeleteParticipantHistory={deleteParticipantFromHistory}
           onUpdateParticipantOverall={updateParticipantOverall}
+          onRenameParticipant={renameParticipant}
           onClearAll={() => {
             clearAll();
             setPlayAsByTournamentId({});

@@ -5,6 +5,7 @@ type Props = {
   title: string;
   participants: Participant[];
   matches: Match[];
+  playAsParticipantId?: string | null;
 };
 
 function shortName(name: string): string {
@@ -17,7 +18,12 @@ function cellResult(match: Match, participantId: string): string {
   return match.winner === participantId ? `R${match.round}\u2705` : `R${match.round}\u274C`;
 }
 
-export function HeadToHeadMatrix({ title, participants, matches }: Props) {
+export function HeadToHeadMatrix({
+  title,
+  participants,
+  matches,
+  playAsParticipantId = null,
+}: Props) {
   const sortedParticipants = [...participants].sort((a, b) => a.name.localeCompare(b.name));
   const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
   const [hoveredColId, setHoveredColId] = useState<string | null>(null);
@@ -77,7 +83,9 @@ export function HeadToHeadMatrix({ title, participants, matches }: Props) {
                 <th
                   key={`col-${participant.id}`}
                   title={participant.name}
-                  className={isColHeaderDimmed(participant.id) ? "matrixDimmed" : ""}
+                  className={`${isColHeaderDimmed(participant.id) ? "matrixDimmed " : ""}${
+                    participant.id === playAsParticipantId ? "matrixTracked" : ""
+                  }`}
                   onMouseEnter={() => {
                     setHoveredColId(participant.id);
                     setHoveredRowId(null);
@@ -94,7 +102,9 @@ export function HeadToHeadMatrix({ title, participants, matches }: Props) {
               <tr key={`row-${rowParticipant.id}`}>
                 <th
                   title={rowParticipant.name}
-                  className={isRowHeaderDimmed(rowParticipant.id) ? "matrixDimmed" : ""}
+                  className={`${isRowHeaderDimmed(rowParticipant.id) ? "matrixDimmed " : ""}${
+                    rowParticipant.id === playAsParticipantId ? "matrixTracked" : ""
+                  }`}
                   onMouseEnter={() => {
                     setHoveredRowId(rowParticipant.id);
                     setHoveredColId(null);
@@ -118,7 +128,12 @@ export function HeadToHeadMatrix({ title, participants, matches }: Props) {
                       key={`${rowParticipant.id}-${colParticipant.id}`}
                       title={displayed}
                       className={`${rowParticipant.id === colParticipant.id ? "diagCell " : ""}${
-                        isDataCellDimmed(rowParticipant.id, colParticipant.id) ? "matrixDimmed" : ""
+                        isDataCellDimmed(rowParticipant.id, colParticipant.id) ? "matrixDimmed " : ""
+                      }${
+                        rowParticipant.id === playAsParticipantId ||
+                        colParticipant.id === playAsParticipantId
+                          ? "matrixTracked"
+                          : ""
                       }`}
                       onMouseEnter={() => {
                         setHoveredCell({ rowId: rowParticipant.id, colId: colParticipant.id });

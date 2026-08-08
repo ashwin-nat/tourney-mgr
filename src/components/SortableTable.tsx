@@ -12,12 +12,14 @@ type Props<T extends object> = {
   data: T[];
   columns: ColumnDef<T>[];
   className?: string;
+  rowClassName?: (row: T) => string | undefined;
 };
 
 export function SortableTable<T extends object>({
   data,
   columns,
   className,
+  rowClassName,
 }: Props<T>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const table = useReactTable({
@@ -58,7 +60,7 @@ export function SortableTable<T extends object>({
       </thead>
       <tbody>
         {table.getRowModel().rows.map((row) => (
-          <tr key={row.id}>
+          <tr key={row.id} className={rowClassName?.(row.original)}>
             {row.getVisibleCells().map((cell) => (
               <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
             ))}

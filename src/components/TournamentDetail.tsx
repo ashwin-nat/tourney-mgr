@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { buildStandings } from "../engine/standings";
 import type { MatchStage, ParticipantHistory, Tournament } from "../types";
+import { getTournamentChampionName } from "../utils/champion";
 import { BracketView } from "./BracketView";
 import { HeadToHeadMatrix } from "./HeadToHeadMatrix";
 import { StandingsTable } from "./StandingsTable";
@@ -76,9 +77,15 @@ export function TournamentDetail({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPlayAsModalOpen]);
 
+  const championName =
+    tournament.status === "COMPLETED" ? getTournamentChampionName(tournament) : null;
+
   return (
     <section className="panel">
-      <h2>{tournament.name}</h2>
+      <h2>
+        {tournament.name}
+        {championName && <span className="championInline"> 🏆 {championName}</span>}
+      </h2>
       <p>
         {tournament.format} | {tournament.status}
       </p>
@@ -142,6 +149,7 @@ export function TournamentDetail({
         <StandingsTable
           participants={tournament.participants}
           standings={tournament.standings}
+          playAsParticipantId={playAsParticipantId}
         />
       )}
       {tournament.format === "LEAGUE" && (
@@ -150,11 +158,13 @@ export function TournamentDetail({
             participants={tournament.participants}
             standings={tournament.standings}
             title="League Standings"
+            playAsParticipantId={playAsParticipantId}
           />
           <HeadToHeadMatrix
             title="League Head-to-Head Matrix"
             participants={tournament.participants}
             matches={tournament.matches.filter((match) => match.stage === "LEAGUE")}
+            playAsParticipantId={playAsParticipantId}
           />
         </div>
       )}
@@ -173,11 +183,13 @@ export function TournamentDetail({
                   participants={groupParticipants}
                   standings={standings}
                   title={`Group ${group.id} Standings`}
+                  playAsParticipantId={playAsParticipantId}
                 />
                 <HeadToHeadMatrix
                   title={`Group ${group.id} Head-to-Head`}
                   participants={groupParticipants}
                   matches={groupMatches}
+                  playAsParticipantId={playAsParticipantId}
                 />
               </div>
             );

@@ -7,9 +7,15 @@ type Props = {
   participants: Participant[];
   standings: Record<string, Standing> | undefined;
   title?: string;
+  playAsParticipantId?: string | null;
 };
 
-export function StandingsTable({ participants, standings, title = "Standings" }: Props) {
+export function StandingsTable({
+  participants,
+  standings,
+  title = "Standings",
+  playAsParticipantId = null,
+}: Props) {
   if (!standings) return null;
   const rows = participants
     .map((participant) => ({
@@ -45,7 +51,12 @@ export function StandingsTable({ participants, standings, title = "Standings" }:
     <section className="panel compactPanel">
       <h3>{title}</h3>
       <div className="tableViewport">
-        <SortableTable data={rows} columns={columns} className="standingsTable" />
+        <SortableTable
+          data={rows}
+          columns={columns}
+          className="standingsTable"
+          rowClassName={(row) => (row.id === playAsParticipantId ? "trackedRow" : undefined)}
+        />
       </div>
     </section>
   );
