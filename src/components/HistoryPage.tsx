@@ -12,6 +12,7 @@ import {
   getTournamentChampionId,
   getTournamentRunnerUpId,
 } from "../utils/champion";
+import { HeadToHeadTimelineModal } from "./HeadToHeadTimelineModal";
 import { SortableTable } from "./SortableTable";
 
 type Props = {
@@ -44,9 +45,9 @@ type StageBucket = {
   draws: number;
 };
 
-type RecentOutcome = "W" | "L" | "D";
+export type RecentOutcome = "W" | "L" | "D";
 
-type RecentResult = {
+export type RecentResult = {
   outcome: RecentOutcome;
   opponentName: string;
   tournamentName: string;
@@ -185,6 +186,46 @@ function getRecentResultsVsOpponent(
   }
 
   return recent.reverse();
+}
+
+export function getAllResultsVsOpponent(
+  tournaments: Tournament[],
+  participantName: string,
+  opponentName: string,
+): RecentResult[] {
+  const participantKey = participantName.trim().toLowerCase();
+  const opponentKey = opponentName.trim().toLowerCase();
+  const all: RecentResult[] = [];
+
+  for (const tournament of tournamentsByRecency(tournaments)) {
+    const participant = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === participantKey,
+    );
+    const opponent = tournament.participants.find(
+      (entry) => entry.name.trim().toLowerCase() === opponentKey,
+    );
+    if (!participant || !opponent) continue;
+
+    const matches = tournament.matches
+      .filter(
+        (match) =>
+          match.played &&
+          ((match.playerA === participant.id && match.playerB === opponent.id) ||
+            (match.playerA === opponent.id && match.playerB === participant.id)),
+      )
+      .sort((a, b) => b.round - a.round);
+
+    for (const match of matches) {
+      all.push({
+        outcome: matchOutcomeForParticipant(match.winner, participant.id),
+        opponentName: opponent.name,
+        tournamentName: tournament.name,
+        round: match.round,
+      });
+    }
+  }
+
+  return all.reverse();
 }
 
 function getCurrentStreakVsOpponent(
@@ -346,6 +387,7 @@ export function HistoryPage({
   const [overallDraft, setOverallDraft] = useState<number>(50);
   const [renameDraft, setRenameDraft] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [timelineOpponentName, setTimelineOpponentName] = useState<string | null>(null);
   const participants = Object.values(participantHistory).sort((a, b) => {
     if (b.elo !== a.elo) return b.elo - a.elo;
     if (b.wins !== a.wins) return b.wins - a.wins;
@@ -508,13 +550,13 @@ export function HistoryPage({
   useEffect(() => {
     if (!selectedParticipant) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !timelineOpponentName) {
         setSelectedParticipantKey(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedParticipant]);
+  }, [selectedParticipant, timelineOpponentName]);
 
   useEffect(() => {
     if (selectedParticipantOverall === null) return;
@@ -524,6 +566,7 @@ export function HistoryPage({
   useEffect(() => {
     setRenameDraft(selectedParticipant?.name ?? "");
     setRenameError(null);
+    setTimelineOpponentName(null);
   }, [selectedParticipant]);
 
   const completed = tournaments.filter((tournament) => tournament.status === "COMPLETED").length;
@@ -745,7 +788,21 @@ export function HistoryPage({
   }));
   const opponentColumns = useMemo<ColumnDef<(typeof opponentRows)[number]>[]>(
     () => [
-      { header: "Opponent", accessorKey: "opponent" },
+      {
+        header: "Opponent",
+        accessorKey: "opponent",
+        cell: (ctx) => {
+          const opponentName = ctx.getValue<string>();
+          return (
+            <button
+              className="linkButton"
+              onClick={() => setTimelineOpponentName(opponentName)}
+            >
+              {opponentName}
+            </button>
+          );
+        },
+      },
       { header: "P", accessorKey: "played" },
       { header: "W", accessorKey: "wins" },
       { header: "L", accessorKey: "losses" },
@@ -1113,6 +1170,14 @@ export function HistoryPage({
             )}
           </section>
         </div>
+      )}
+      {selectedParticipant && timelineOpponentName && (
+        <HeadToHeadTimelineModal
+          participantName={selectedParticipant.name}
+          opponentName={timelineOpponentName}
+          tournaments={tournaments}
+          onClose={() => setTimelineOpponentName(null)}
+        />
       )}
     </section>
   );

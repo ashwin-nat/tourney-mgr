@@ -589,6 +589,86 @@ td {
   align-items: center;
 }
 
+.timelineModalCard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.timelineFixed {
+  flex: 0 0 auto;
+}
+
+.timelineTableViewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.timelineTableViewport thead th {
+  position: sticky;
+  top: 0;
+  background: #0f1726;
+  z-index: 1;
+}
+
+.timelineLegend {
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.timelineChartWrap {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.timelineChart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.timelineBaseline {
+  stroke: #375070;
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+.timelineAxisLabel {
+  fill: #7f93ad;
+  font-size: 10px;
+}
+
+.timelineLine {
+  stroke: #4d8dff;
+  stroke-width: 2;
+}
+
+.timelineMarker {
+  stroke: #0f1726;
+  stroke-width: 2;
+  cursor: pointer;
+  transition: r 100ms ease;
+}
+
+.timelineTooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 12px));
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #121c2edf;
+  border: 1px solid #2a3a57;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1;
+}
+
 details {
   border: 1px dashed #3a4f73;
   border-radius: 10px;
